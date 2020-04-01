@@ -5,16 +5,16 @@
 from setuptools import setup
 
 setup(
-    name='rfidgeek',
-    version='2.0.1',  # Use bumpversion to bump
+    name='pydlprfid2',
+    version='0.1',
 
-    description='Read/write ISO 15693 cards following the Danish RFID data model for libraries',
-    long_description='Read/write ISO 15693 cards following the Danish RFID data model for libraries, using serial communication to [RFIDGeek](http://rfidgeek.com/) boards.',
-    url='https://github.com/scriptotek/pyrfidgeek',
-    author='Dan Michael O. Heggø',
-    author_email='d.m.heggo@ub.uio.no',
+    description='Drive DLP RFID2 reader to read/write EEPROM',
+    long_description='pyrfidgeek fork that drive DLP RFID2 reader to read/write EEPROM',
+    url='https://github.com/Martoni/pydlprfid2',
+    author='Fabien Marteau',
+    author_email='fabien.marteau@armadeus.com',
     license='MIT',
-    keywords='rfid iso15693 iso14443 libdev',
+    keywords='rfid iso15693 iso14443 libdev trf7970a dlprfid2',
 
     # See https://pypi.python.org/pypi?%3Aaction=list_classifiers
     classifiers=[
@@ -24,17 +24,12 @@ setup(
         # Pick your license as you wish (should match "license" above)
         'License :: OSI Approved :: MIT License',
 
-        # Specify the Python versions you support here. In particular, ensure
-        # that you indicate whether you support Python 2, Python 3 or both.
-        'Programming Language :: Python :: 2',
-        'Programming Language :: Python :: 2.7',
         'Programming Language :: Python :: 3',
-        'Programming Language :: Python :: 3.3',
-        'Programming Language :: Python :: 3.4',
-        'Programming Language :: Python :: 3.5',
+        'Programming Language :: Python :: 3.7',
     ],
 
-    packages=['rfidgeek'],
+    packages=['pydlprfid2'],
+    scripts=['bin/pdr2'],
 
     # Run-time dependencies
     install_requires=['pyserial'],
