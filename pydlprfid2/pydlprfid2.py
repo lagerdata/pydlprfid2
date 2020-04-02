@@ -26,7 +26,7 @@ ISO14443A = 'ISO14443A'
 ISO14443B = 'ISO14443B'
 
 DLP_CMD = {
-        "WRITEREG":   {"code": '10', "desc": "Write register ?"},
+        "WRITEREG":   {"code": '10', "desc": "Write register"},
         "INV15693":   {"code": '14', "desc": "ISO15693 inventory"},
         "RAWWRITE":   {"code": '18', "desc": "Everything after the 18 is what is actually transmitted over the air"},
         "INTERNANT":  {"code": '2A', "desc": "Enable internal antenna"},
@@ -222,7 +222,6 @@ class PyDlpRfid2(object):
                                                                single_slot=single_slot),
                                                command_code='%02X'%M24LR64ER_CMD["INVENTORY"]["code"],
                                                data='00')
-        print(f"DEBUG ISO15693 response: {response}")
         for itm in response:
             itm = itm.split(',')
             if itm[0] == 'z':
@@ -230,8 +229,9 @@ class PyDlpRfid2(object):
             else:
                 if len(itm[0]) == 16:
                     uid = itm[0]
-                    logger.debug('Found tag: %s (%s) ', uid, itm[1])
-                    yield uid
+                    rssi = itm[1]
+                    logger.debug('Found tag: %s (%s) ', uid, rssi)
+                    yield uid, rssi
 
     def read_danish_model_tag(self, uid):
         # Command code 0x23: Read multiple blocks
@@ -444,10 +444,8 @@ class PyDlpRfid2(object):
         length = binascii.hexlify(length).decode('ascii')
 
         result = sof + length + result
-        print(f"DEBUG write: {result}")
         self.write(result)
         response = self.read()
-        print(f"DEBUG read: {response}")
         return self.get_response(response)
 
     def issue_iso15693_command(self, cmd, flags='', command_code='', data=''):

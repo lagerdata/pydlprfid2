@@ -24,16 +24,18 @@ def usages():
     print("-h, --help               print this help")
     print("-d, --devtty filename    uart dev name path")
     print("-p, --protocol PROTOCOL  default ISO15693")
+    print("-l, --listtag            list tag present")
 
 def main(argv):
     try:
-        opts, args = getopt.getopt(argv, "hd:p:",
-                                  ["help", "devtty=", "--protocol="])
+        opts, args = getopt.getopt(argv, "hd:p:l",
+                  ["help", "devtty=", "protocol=", "listtag"])
     except getopt.GetoptError:
         usages()
         sys.exit(2)
     
-    devtty=None
+    devtty = None
+    listtag = False
     protocol=ISO15693
     for opt, arg in opts:
         if opt in ["-h", "--help"]:
@@ -48,12 +50,16 @@ def main(argv):
                 protocol = ISO14443A
             elif arg == "ISO14443B":
                 protocol = ISO14443B
+        elif opt in ["-l", "--listtag"]:
+            listtag = True
+
 
     if devtty is None:
         print("Wrong parameter: Give a devtty path")
         usages()
         sys.exit(2)
 
+    print("Initilize DLP")
     try:
         reader = PyDlpRfid2(serial_port=devtty, debug=True)
     except serial.serialutil.SerialException:
@@ -61,8 +67,14 @@ def main(argv):
         sys.exit(1)
 
     reader.set_protocol(protocol)
-    uids = list(reader.inventory())
-    print(uids)
-
-    print("! TODO !")
+    reader.enable_external_antenna()
+    if listtag:
+        print("Looking for tags")
+        uids = list(reader.inventory())
+        if len(uids) == 0:
+            print("No tags found")
+        else:
+            print(f"{len(uids)} tags found")
+            for uid, rssi in uids:
+                print(f"UID:{uid} RSSI:{rssi}")
 
