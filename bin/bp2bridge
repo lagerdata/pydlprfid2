@@ -1,0 +1,7 @@
+#! /usr/bin/env python
+# -*- coding: utf-8 -*-
+
+from pydlprfid2 import bp2bridge
+import sys
+
+bp2bridge.launchmain(sys.argv[1:])

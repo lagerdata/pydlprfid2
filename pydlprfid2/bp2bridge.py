@@ -49,12 +49,13 @@ def usage():
     print("-h, --help       print this message")
     print("-d, --devpath    give the uart device path")
 
-if __name__ == "__main__":
+
+def launchmain(argv):
     if sys.version_info[0] < 3:
         raise Exception("Must be using Python 3")
 
     try:
-        opts, args = getopt.getopt(sys.argv[1:], "hd:",
+        opts, args = getopt.getopt(argv, "hd:",
                                    ["help", "devpath="])
     except getopt.GetoptError as err:
         print(err)
@@ -76,3 +77,7 @@ if __name__ == "__main__":
     bb.to_bridge()
     print("{} is now configured as standard tty uart ({})"
             .format(devpath, bb.BAUDRATE))
+
+
+if __name__ == "__main__":
+    launchmain(sys.argv[1:])
