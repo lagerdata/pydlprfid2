@@ -14,7 +14,7 @@ try:
 except ImportError:
     print('Please install six to run this example')
 
-from rfidgeek import PyRFIDGeek, ISO15693
+from pydlprfid2 import PyDlpRfid2, ISO15693
 
 # You might need to change this:
 COM_PORT_NAME = '/dev/ttyACM0'
@@ -27,7 +27,7 @@ logger.addHandler(ch)
 
 
 try:
-    reader = PyRFIDGeek(serial_port=COM_PORT_NAME, debug=True)
+    reader = PyDlpRfid2(serial_port=COM_PORT_NAME, debug=True)
 except serial.serialutil.SerialException:
     print("Failed to open serial port " + config['serial']['port'])
     sys.exit(1)

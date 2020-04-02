@@ -48,10 +48,13 @@ def flagsbyte(double_sub_carrier=False, high_data_rate=False, inventory=False,
     return '%02X' % int(bits, 2)     # return hex byte
 
 
-class PyRFIDGeek(object):
+class PyDlpRfid2(object):
+    BAUDRATE=115200
+    STOP_BITS=serial.STOPBITS_ONE
+    PARITY=serial.PARITY_NONE
+    BYTESIZE=serial.EIGHTBITS
 
-    def __init__(self, serial_port, serial_baud_rate=115200, serial_stop_bits=serial.STOPBITS_ONE,
-                 serial_parity=serial.PARITY_NONE, serial_data_bits=serial.EIGHTBITS, debug=False):
+    def __init__(self, serial_port, debug=False):
 
         self.protocol = None
 
@@ -61,10 +64,10 @@ class PyRFIDGeek(object):
             logger.setLevel(logging.INFO)
 
         self.sp = serial.Serial(port=serial_port,
-                                baudrate=serial_baud_rate,
-                                stopbits=serial_stop_bits,
-                                parity=serial_parity,
-                                bytesize=serial_data_bits,
+                                baudrate=self.BAUDRATE,
+                                stopbits=self.STOP_BITS,
+                                parity=self.PARITY,
+                                bytesize=self.BYTESIZE,
                                 timeout=0.1)
 
         if not self.sp:
