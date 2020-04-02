@@ -25,6 +25,37 @@ ISO15693 = 'ISO15693'
 ISO14443A = 'ISO14443A'
 ISO14443B = 'ISO14443B'
 
+# commands codes from datasheet m24lr64e-r.pdf page 78
+M24LR64ER_CMD = {
+        "INVENTORY":           {"code": 0x01, "desc": "Inventory"},
+        "QUIET":               {"code": 0x02, "desc": "Stay Quiet"},
+        "READ_SINGLE_BLOCK":   {"code": 0x20, "desc": "Read Single Block"},
+        "WRITE_SINGLE_BLOCK":  {"code": 0x21, "desc": "Write Single Block"},
+        "READ_MULTIPLE_BLOCK": {"code": 0x23, "desc": "Read Multiple Block"},
+        "SELECT":              {"code": 0x25, "desc": "Select"},
+        "RESET_TO_READY":      {"code": 0x26, "desc": "Reset to Ready"},
+        "WRITE_AFI":           {"code": 0x27, "desc": "Write AFI"},
+        "LOCK_AFI":            {"code": 0x28, "desc": "Lock AFI"},
+        "WRITE_DSFID":         {"code": 0x29, "desc": "Write DSFID"},
+        "LOCK_DSFID":          {"code": 0x2A, "desc": "Lock DSFID"},
+        "GET_SYS_INFO":        {"code": 0x2B, "desc": "Get System Info"},
+
+        "GET_MULT_BLOC_SEC_INFO":{"code": 0x2C, "desc": "Get Multiple Block Security Status"},
+        "WRITE_SECT_PSWD":   {"code": 0xB1, "desc": "Write-sector Password"},
+        "LOCK_SECT_PSWD":    {"code": 0xB2, "desc": "Lock-sector"},
+        "PRESENT_SECT_PSWD": {"code": 0xB3, "desc": "Present-sector Password"},
+        "FAST_READ_SINGLE_BLOCK": {"code": 0xC0, "desc": "Fast Read Single Block"},
+        "FAST_INVENTORY_INIT":    {"code": 0xC1, "desc": "Fast Inventory Initiated"},
+        "FAST_INIT":              {"code": 0xC2, "desc": "Fast Initiate"},
+        "FAST_READ_MULT_BLOCK":   {"code": 0xC3, "desc": "Fast Read Multiple Block"},
+        "INVENTORY_INIT":         {"code": 0xD1, "desc": "Inventory Initiated"},
+        "INITIATE":               {"code": 0xD2, "desc": "Initiate"},
+        "READCFG": {"code": 0xA0, "desc": "ReadCfg"},
+        "WRITEEHCFG": {"code": 0xA1, "WriteEHCfg"},
+        "SETRSTEHEN": {"code": 0xA2, "SetRstEHEn"},
+        "CHECKEHEN" : {"code": 0xA3, "CheckEHEn"},
+        "WRITEDOCFG": {"code": 0xA4, "WriteDOCfg"},
+        }
 
 def flagsbyte(double_sub_carrier=False, high_data_rate=False, inventory=False,
               protocol_extension=False, afi=False, single_slot=False,
@@ -157,7 +188,7 @@ class PyDlpRfid2(object):
         response = self.issue_iso15693_command(cmd='14',
                                                flags=flagsbyte(inventory=True,
                                                                single_slot=single_slot),
-                                               command_code='01',
+                                               command_code=M24LR64ER_CMD["INVENTORY"]["code"],
                                                data='00')
         for itm in response:
             itm = itm.split(',')
