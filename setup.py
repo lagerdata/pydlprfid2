@@ -33,7 +33,4 @@ setup(
 
     # Run-time dependencies
     install_requires=['pyserial'],
-
-    setup_requires=['pytest-runner'],
-    tests_require=['pytest', 'pytest-pep8']
 )
