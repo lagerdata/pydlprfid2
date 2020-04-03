@@ -23,16 +23,31 @@ ISO15693 = 'ISO15693'
 ISO14443A = 'ISO14443A'
 ISO14443B = 'ISO14443B'
 
+# sloa157.pdf Table 4 «HOST (PC GUI to MCU)» page 18
 DLP_CMD = {
-        "WRITEREG":   {"code": '10', "desc": "Write register"},
-        "INV15693":   {"code": '14', "desc": "ISO15693 inventory"},
-        "RAWWRITE":   {"code": '18', "desc": ("Everything after the 18 is what is"
+        "DIRECTMODE": {"code": '0F', "desc": "Direct mode"},
+        "WRITESINGLE":  {"code": '10', "desc": "Write single"},
+        "WRITECONTINU": {"code": '11', "desc": "Write Continuous"},
+        "READSINGLE":   {"code": '12', "desc": "Read single"},
+        "READCONTINU":  {"code": '13', "desc": "Read Continuous"},
+        "ANTICOL15693": {"code": '14', "desc": "ISO15693 anticollision"},
+        "DIRECTCMD":    {"code": '15', "desc": "Direct command"},
+        "RAWWRITE":     {"code": '16', "desc": "Raw write"},
+        "REQUESTCMD":     {"code": '18', "desc": ("Everything after the 18 is what is"
                                               "actually transmitted over the air")},
         "INTERNANT":  {"code": '2A', "desc": "Enable internal antenna"},
         "EXTERNANT":  {"code": '2B', "desc": "Enable external antenna"},
         "GPIOMUX":    {"code": '2C', "desc": "GPIO multiplexer config"},
         "GPIOCFG":    {"code": '2D', "desc": "GPIO terminaison config"},
-        "INV14443A":  {"code": 'A0', "desc": "ISO14443A inventory"},
+       
+        "NFCT2CMD":   {"code": '72', "desc": "NFC Type 2 command"},
+
+        "REQA14443A":  {"code": 'A0', "desc": "ISO14443A Anticollision REQA"},
+        "WUPA14443A":  {"code": 'A1', "desc": "ISO14443A Anticollision WUPA"},
+        "SEL14443A":  {"code": 'A2', "desc": "ISO14443A Select"},
+        "REQB14443A":  {"code": 'B0', "desc": "ISO14443A Anticollision REQB"},
+        "WUPB14443A":  {"code": 'B1', "desc": "ISO14443A Anticollision WUPB"},
+ 
         "AGCSEL":     {"code": 'F0', "desc": "AGC selection"},
         "AMPMSEL":    {"code": 'F1', "desc": "AM/PM input selection"},
         "SETLED2":    {"code": 'FB', "desc": "Set Led 2"},
@@ -45,6 +60,7 @@ DLP_CMD = {
         "CLRLED4":    {"code": 'F8', "desc": "Clear Led 4"},
         "CLRLED5":    {"code": 'F6', "desc": "Clear Led 5"},
         "CLRLED6":    {"code": 'F4', "desc": "Clear Led 6"},
+        "VERSION":    {"code": 'FE', "desc": "Get firmware version"},
         "INITIALIZE": {"code": 'FF', "desc": "Initialize reader"},
 }
 
@@ -168,7 +184,7 @@ class PyDlpRfid2(object):
         # self.issue_evm_command(cmd='10', prms='0021')
 
         # Select protocol: 15693 with full power
-        self.issue_evm_command(cmd=DLP_CMD["WRITEREG"]["code"],
+        self.issue_evm_command(cmd=DLP_CMD["WRITESINGLE"]["code"],
                                prms='00210100')
 
         # Setting up registers:
@@ -179,7 +195,7 @@ class PyDlpRfid2(object):
             ISO14443A: '09',
             ISO14443B: '0C',
         }
-        self.issue_evm_command(cmd=DLP_CMD["WRITEREG"]["code"],
+        self.issue_evm_command(cmd=DLP_CMD["WRITESINGLE"]["code"],
                                prms='0021' + '01' + protocol_values[protocol])
 
         # 3. AGC selection (0xF0) : AGC enable (0x00)
@@ -215,7 +231,7 @@ class PyDlpRfid2(object):
             <<< UID + BCC
 
         """
-        response = self.issue_evm_command(cmd=DLP_CMD["INV14443A"]["code"])
+        response = self.issue_evm_command(cmd=DLP_CMD["REQA14443A"]["code"])
 
         for itm in response:
             iba = bytearray.fromhex(itm)
@@ -236,7 +252,7 @@ class PyDlpRfid2(object):
     def inventory_iso15693(self, single_slot=False):
         # Command code 0x01: ISO 15693 Inventory request
         # Example: 010B000304 14 24 0100 0000
-        response = self.issue_iso15693_command(cmd=DLP_CMD["INV15693"]["code"],
+        response = self.issue_iso15693_command(cmd=DLP_CMD["ANTICOL15693"]["code"],
                                                flags=flagsbyte(inventory=True,
                                                                single_slot=single_slot),
                                                command_code='%02X'%M24LR64ER_CMD["INVENTORY"]["code"],
@@ -252,20 +268,39 @@ class PyDlpRfid2(object):
                     self.logger.debug('Found tag: %s (%s) ', uid, rssi)
                     yield reverse_uid(uid), rssi
 
-    def eeprom_read_single_block(self, uid, blocknum):
-        response = self.issue_iso15693_command(cmd=DLP_CMD["RAWWRITE"]["code"],
-                                   flags=flagsbyte(address=False),  # 32 (dec) <-> 20 (hex)
-                                   command_code='%02X'%M24LR64ER_CMD["READ_SINGLE_BLOCK"]["code"],
-                                   data='%02X' % (blocknum))
-                                   #data=uid + '%02X' % (blocknum))
+    def get_dlp_rfid2_firmware_version(self):
+        response = self.issue_evm_command(DLP_CMD["VERSION"]["code"], get_full_response=True)
         print(response)
         return response
+
+
+    def eeprom_read_multiple_block(self, uid, blocknum, blockoffset):
+        if blocknum < 1:
+            raise Exception("Blocknum can't be 0 or less")
+        response = self.issue_iso15693_command(cmd=DLP_CMD["REQUESTCMD"]["code"],
+                                   flags=flagsbyte(address=True),
+                                   command_code='%02X'%M24LR64ER_CMD["READ_MULTIPLE_BLOCK"]["code"],
+                                   data=reverse_uid(uid) + '%02X%02X' % (blockoffset, blocknum - 1))
+        return response
+
+
+    def eeprom_read_single_block(self, uid, blockoffset):
+        response = self.issue_iso15693_command(cmd=DLP_CMD["REQUESTCMD"]["code"],
+                                   flags=flagsbyte(address=True),
+                                   command_code='%02X'%M24LR64ER_CMD["READ_SINGLE_BLOCK"]["code"],
+                                   data=reverse_uid(uid) + '%02X00' % (blockoffset))
+        if len(response) == 1 and response[0] != '':
+            return response[0]
+        else:
+            return None
+
+
 
     def read_danish_model_tag(self, uid):
         # Command code 0x23: Read multiple blocks
         block_offset = 0
         number_of_blocks = 8
-        response = self.issue_iso15693_command(cmd=DLP_CMD["RAWWRITE"]["code"],
+        response = self.issue_iso15693_command(cmd=DLP_CMD["REQUESTCMD"]["code"],
                                      flags=flagsbyte(address=True),  # 32 (dec) <-> 20 (hex)
                                      command_code='%02X'%M24LR64ER_CMD["READ_MULTIPLE_BLOCK"]["code"],
                                      data=uid + '%02X%02X' % (block_offset, number_of_blocks))
@@ -422,7 +457,7 @@ class PyDlpRfid2(object):
         if type(data) != list or len(data) != 4:
             raise StandardError('write_block got data of unknown type/length')
 
-        response = self.issue_iso15693_command(cmd=DLP_CMD["RAWWRITE"]["code"],
+        response = self.issue_iso15693_command(cmd=DLP_CMD["REQUESTCMD"]["code"],
                                                flags=flagsbyte(address=True),  # 32 (dec) <-> 20 (hex)
                                                command_code='%02X'%M24LR64ER_CMD["WRITE_SINGLE_BLOCK"]["code"],
                                                data='%s%02X%s' % (uid, block_number, ''.join(data)))
@@ -433,7 +468,7 @@ class PyDlpRfid2(object):
             return False
 
     def unlock_afi(self, uid):
-        self.issue_iso15693_command(cmd=DLP_CMD["RAWWRITE"]["code"],
+        self.issue_iso15693_command(cmd=DLP_CMD["REQUESTCMD"]["code"],
                                     flags=flagsbyte(address=False,
                                                     high_data_rate=True,
                                                     option=False),  # 32 (dec) <-> 20 (hex)
@@ -441,14 +476,14 @@ class PyDlpRfid2(object):
                                     data='C2')
 
     def lock_afi(self, uid):
-        self.issue_iso15693_command(cmd=DLP_CMD["RAWWRITE"]["code"],
+        self.issue_iso15693_command(cmd=DLP_CMD["REQUESTCMD"]["code"],
                                     flags=flagsbyte(address=False,
                                                     high_data_rate=False,
                                                     option=False),  # 32 (dec) <-> 20 (hex)
                                     command_code='%02X'%M24LR64ER_CMD["WRITE_AFI"]["code"],
                                     data='07')
 
-    def issue_evm_command(self, cmd, prms=''):
+    def issue_evm_command(self, cmd, prms='', get_full_response=False):
         # The EVM protocol has a general form as shown below:
         #  1. SOF (Start of File): 0x01
         #  2. LENGTH : Two bytes define the number of bytes in the frame including SOF. Least Significant Byte first!
@@ -474,7 +509,10 @@ class PyDlpRfid2(object):
         result = sof + length + result
         self.write(result.upper())
         response = self.read()
-        return self.get_response(response)
+        if get_full_response:
+            return response
+        else:
+            return self.get_response(response)
 
     def issue_iso15693_command(self, cmd, flags='', command_code='', data=''):
         return self.issue_evm_command(cmd, flags + command_code + data)
@@ -483,7 +521,13 @@ class PyDlpRfid2(object):
         self.sp.readall()
 
     def write(self, msg):
-        self.logger.debug('SEND%3d: ' % (len(msg)/2) + msg[0:10] + colored(msg[10:12], attrs=['underline']) + msg[12:14] + colored(msg[14:], 'green'))
+        self.logger.debug('SEND%3d: ' % (len(msg)/2) +
+                          msg[0:2] +
+                          colored(msg[2:4], 'yellow') +
+                          msg[4:10] +
+                          colored(msg[10:12], 'red') +
+                          msg[12:-4] +
+                          colored(msg[-4:], 'green'))
         self.sp.write(msg.encode('ascii'))
 
     def read(self):

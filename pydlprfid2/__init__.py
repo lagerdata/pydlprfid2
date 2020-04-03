@@ -18,14 +18,16 @@ def usages():
     print("-p, --protocol=PROTOCOL  default ISO15693")
     print("-l, --listtag            list tag present")
     print("-u, --uid=UID            give UID to access")
-    print("-r, --read=BLOCKNUM      read one block")
+    print("-r, --read=BLOCKNUM      read one block (hex)")
+    print("-s, --readmultiple=OFFSET:BLOCKNUM")
+    print("                         read multiple block (hex:hex)")
 
 def main(argv):
     try:
-        opts, args = getopt.getopt(argv, "hd:p:lu:r:v",
+        opts, args = getopt.getopt(argv, "hd:p:lu:r:s:v",
                   ["help", "devtty=", "protocol=",
                    "listtag", "uid=", "read=",
-                   "verbose"])
+                   "verbose", "readmultiple="])
     except getopt.GetoptError:
         usages()
         sys.exit(2)
@@ -34,6 +36,7 @@ def main(argv):
     listtag = False
     protocol=ISO15693
     uid = None
+    blockoffset = None
     blocknum = None
     loglevel = logging.INFO
     for opt, arg in opts:
@@ -54,9 +57,13 @@ def main(argv):
         elif opt in ["-u", "--uid"]:
             uid = arg
         elif opt in ["-r", "--read"]:
-            blocknum = int(arg)
+            blockoffset = int(arg, 16)
         elif opt in ["-v", "--verbose"]:
             loglevel = logging.DEBUG
+        elif opt in ("-s", "--readmultiple"):
+            stroffset, strblocknum = arg.split(":")
+            blockoffset = int(stroffset, 16)
+            blocknum = int(strblocknum, 16)
 
     if devtty is None:
         print("Wrong parameter: Give a devtty path")
@@ -70,6 +77,9 @@ def main(argv):
         print(f"Failed to open serial port {devtty}")
         sys.exit(1)
 
+    if loglevel == logging.DEBUG: # get version only in debug messages level
+        reader.get_dlp_rfid2_firmware_version()
+
     reader.set_protocol(protocol)
     reader.enable_external_antenna()
 
@@ -82,9 +92,14 @@ def main(argv):
             print(f"{len(uids)} tags found")
             for uid, rssi in uids:
                 print(f"UID: {uid} RSSI: {rssi}")
-    elif blocknum is not None:
+    elif blockoffset is not None:
         if uid is None:
             print("Please give the UID")
             sys.exit(1)
-        value = reader.eeprom_read_single_block(uid, blocknum)
-        print(f"Block {blocknum} : {value}")
+        if blocknum is None:
+            value = reader.eeprom_read_single_block(uid, blockoffset)
+            print(f"Block 0x{blockoffset:02X} : {value}")
+        else:
+            values = reader.eeprom_read_multiple_block(uid, blocknum, blockoffset)
+            print(f"{values}")
+
