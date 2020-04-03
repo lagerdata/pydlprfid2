@@ -1,12 +1,11 @@
 # -*- coding: utf-8; tab-width: 4; indent-tabs-mode: nil; c-basic-offset: 4 -*-
 # vim:fenc=utf-8:et:sw=4:ts=4:sts=4:tw=0
 
-from __future__ import print_function
-import serial
-import logging
 import re
-import pprint
 import time
+import serial
+import pprint
+import logging
 import binascii
 
 try:
@@ -19,7 +18,6 @@ except ImportError:
 
 from .crc import CRC
 
-logger = logging.getLogger(__name__)
 
 ISO15693 = 'ISO15693'
 ISO14443A = 'ISO14443A'
@@ -28,11 +26,12 @@ ISO14443B = 'ISO14443B'
 DLP_CMD = {
         "WRITEREG":   {"code": '10', "desc": "Write register"},
         "INV15693":   {"code": '14', "desc": "ISO15693 inventory"},
-        "RAWWRITE":   {"code": '18', "desc": "Everything after the 18 is what is actually transmitted over the air"},
+        "RAWWRITE":   {"code": '18', "desc": ("Everything after the 18 is what is"
+                                              "actually transmitted over the air")},
         "INTERNANT":  {"code": '2A', "desc": "Enable internal antenna"},
         "EXTERNANT":  {"code": '2B', "desc": "Enable external antenna"},
         "GPIOMUX":    {"code": '2C', "desc": "GPIO multiplexer config"},
-        "GPIOCFG":    {"code": '2D', "desc": "GPIO terminaison config"},
+        "GPIOCFG":    {"code": '2D', "desc": "GPIO terminaison config"},
         "INV14443A":  {"code": 'A0', "desc": "ISO14443A inventory"},
         "AGCSEL":     {"code": 'F0', "desc": "AGC selection"},
         "AMPMSEL":    {"code": 'F1', "desc": "AM/PM input selection"},
@@ -82,6 +81,18 @@ M24LR64ER_CMD = {
         "WRITEDOCFG": {"code": 0xA4, "desc": "WriteDOCfg"}
         }
 
+def reverse_uid(uid):
+    if len(uid) != 16:
+        raise Exception(f"Wrong uid size {len(uid)}, should be 16")
+    return (uid[-2:] +
+            uid[-4:-2] +
+            uid[-6:-4] +
+            uid[-8:-6] +
+            uid[-10:-8] +
+            uid[-12:-10] +
+            uid[-14:-12] +
+            uid[-16:-14])
+
 def flagsbyte(double_sub_carrier=False, high_data_rate=False, inventory=False,
               protocol_extension=False, afi=False, single_slot=False,
               option=False, select=False, address=False):
@@ -109,15 +120,9 @@ class PyDlpRfid2(object):
     PARITY=serial.PARITY_NONE
     BYTESIZE=serial.EIGHTBITS
 
-    def __init__(self, serial_port, debug=False):
-
+    def __init__(self, serial_port, loglevel=logging.INFO):
         self.protocol = None
-
-        if debug:
-            logger.setLevel(logging.DEBUG)
-        else:
-            logger.setLevel(logging.INFO)
-
+        self.__log_config(loglevel)
         self.sp = serial.Serial(port=serial_port,
                                 baudrate=self.BAUDRATE,
                                 stopbits=self.STOP_BITS,
@@ -128,13 +133,27 @@ class PyDlpRfid2(object):
         if not self.sp:
             raise StandardError('Could not connect to serial port ' + serial_port)
 
-        logger.debug('Connected to ' + self.sp.portstr)
+        self.logger.debug('Connected to ' + self.sp.portstr)
         self.flush()
+
+    def __log_config(self, loglevel):
+        self.logger = logging.getLogger(__name__)
+        # create console handler and set level to debug
+        ch = logging.StreamHandler()
+        ch.setLevel(loglevel)
+        # create formatter
+        formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+        # add formatter to ch
+        ch.setFormatter(formatter)
+
+        # add ch to logger
+        self.logger.addHandler(ch)
+        self.logger.setLevel(loglevel)
+
 
     def enable_external_antenna(self):
         cmdstr = DLP_CMD["EXTERNANT"]["code"]
-        self.issue_evm_command(cmd=cmdstr)  # Should return "TRF7970A EVM"
-
+        self.issue_evm_command(cmd=cmdstr)
 
     def set_protocol(self, protocol=ISO15693):
 
@@ -202,14 +221,14 @@ class PyDlpRfid2(object):
             iba = bytearray.fromhex(itm)
             # Assume 4-byte UID + 1 byte Block Check Character (BCC)
             if len(iba) != 5:
-                logger.warn('Encountered tag with UID of unknown length')
+                self.logger.warn('Encountered tag with UID of unknown length')
                 continue
             if iba[0] ^ iba[1] ^ iba[2] ^ iba[3] ^ iba[4] != 0:
-                logger.warn('BCC check failed for tag')
+                self.logger.warn('BCC check failed for tag')
                 continue
             uid = itm[:8]  # hex string, so each byte is two chars
 
-            logger.debug('Found tag: %s (%s) ', uid, itm[8:])
+            self.logger.debug('Found tag: %s (%s) ', uid, itm[8:])
             yield uid
 
             # See https://github.com/nfc-tools/libnfc/blob/master/examples/nfc-anticol.c
@@ -225,22 +244,31 @@ class PyDlpRfid2(object):
         for itm in response:
             itm = itm.split(',')
             if itm[0] == 'z':
-                logger.debug('Tag conflict!')
+                self.logger.debug('Tag conflict!')
             else:
                 if len(itm[0]) == 16:
                     uid = itm[0]
                     rssi = itm[1]
-                    logger.debug('Found tag: %s (%s) ', uid, rssi)
-                    yield uid, rssi
+                    self.logger.debug('Found tag: %s (%s) ', uid, rssi)
+                    yield reverse_uid(uid), rssi
+
+    def eeprom_read_single_block(self, uid, blocknum):
+        response = self.issue_iso15693_command(cmd=DLP_CMD["RAWWRITE"]["code"],
+                                   flags=flagsbyte(address=False),  # 32 (dec) <-> 20 (hex)
+                                   command_code='%02X'%M24LR64ER_CMD["READ_SINGLE_BLOCK"]["code"],
+                                   data='%02X' % (blocknum))
+                                   #data=uid + '%02X' % (blocknum))
+        print(response)
+        return response
 
     def read_danish_model_tag(self, uid):
         # Command code 0x23: Read multiple blocks
         block_offset = 0
         number_of_blocks = 8
         response = self.issue_iso15693_command(cmd=DLP_CMD["RAWWRITE"]["code"],
-                                               flags=flagsbyte(address=True),  # 32 (dec) <-> 20 (hex)
-                                               command_code='%02X'%M24LR64ER_CMD["READ_MULTIPLE_BLOCK"]["code"],
-                                               data=uid + '%02X%02X' % (block_offset, number_of_blocks))
+                                     flags=flagsbyte(address=True),  # 32 (dec) <-> 20 (hex)
+                                     command_code='%02X'%M24LR64ER_CMD["READ_MULTIPLE_BLOCK"]["code"],
+                                     data=uid + '%02X%02X' % (block_offset, number_of_blocks))
 
         response = response[0]
         if response == 'z':
@@ -331,7 +359,7 @@ class PyDlpRfid2(object):
             print(data_bytes[x*4:x*4+4])
             attempt = 1
             while not self.write_block(uid, x, data_bytes[x*4:x*4+4]):
-                logger.warn('Attempt %d of %d: Write failed, retrying...' % (attempt, max_attempts))
+                self.logger.warn('Attempt %d of %d: Write failed, retrying...' % (attempt, max_attempts))
                 if attempt >= max_attempts:
                     return False
                 else:
@@ -349,9 +377,9 @@ class PyDlpRfid2(object):
                 attempts += 1
                 success = self.write_block(uid, x, data_bytes[x*4:x*4+4])
                 if not success:
-                    logger.warn('Write failed, retrying')
+                    self.logger.warn('Write failed, retrying')
                     if attempts > max_attempts:
-                        logger.warn('Giving up!')
+                        self.logger.warn('Giving up!')
                         return False
                     # time.sleep(1.0)
         return True
@@ -399,7 +427,7 @@ class PyDlpRfid2(object):
                                                command_code='%02X'%M24LR64ER_CMD["WRITE_SINGLE_BLOCK"]["code"],
                                                data='%s%02X%s' % (uid, block_number, ''.join(data)))
         if response[0] == '00':
-            logger.debug('Wrote block %d successfully', block_number)
+            self.logger.debug('Wrote block %d successfully', block_number)
             return True
         else:
             return False
@@ -444,7 +472,7 @@ class PyDlpRfid2(object):
         length = binascii.hexlify(length).decode('ascii')
 
         result = sof + length + result
-        self.write(result)
+        self.write(result.upper())
         response = self.read()
         return self.get_response(response)
 
@@ -455,12 +483,12 @@ class PyDlpRfid2(object):
         self.sp.readall()
 
     def write(self, msg):
-        logger.debug('SEND%3d: ' % (len(msg)/2) + msg[0:10] + colored(msg[10:12], attrs=['underline']) + msg[12:14] + colored(msg[14:], 'green'))
+        self.logger.debug('SEND%3d: ' % (len(msg)/2) + msg[0:10] + colored(msg[10:12], attrs=['underline']) + msg[12:14] + colored(msg[14:], 'green'))
         self.sp.write(msg.encode('ascii'))
 
     def read(self):
         msg = self.sp.readall()
-        logger.debug('RETR%3d: ' % (len(msg)/2) + colored(pprint.saferepr(msg).strip("'"), 'cyan'))
+        self.logger.debug('RETR%3d: ' % (len(msg)/2) + colored(pprint.saferepr(msg).strip("'"), 'cyan'))
         return msg
 
     def get_response(self, response):
