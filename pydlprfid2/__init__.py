@@ -18,7 +18,7 @@ def usages():
     print("-p, --protocol=PROTOCOL  default ISO15693")
     print("-l, --listtag            list tag present")
     print("-u, --uid=UID            give UID to access")
-    print("-r, --read=BLOCKNUM      read one block (hex)")
+    print("-r, --read=OFFSET        read one block (hex)")
     print("-s, --readmultiple=OFFSET:BLOCKNUM")
     print("                         read multiple block (hex:hex)")
 
