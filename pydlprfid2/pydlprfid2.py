@@ -220,6 +220,7 @@ class PyDlpRfid2(object):
         elif self.protocol == ISO14443A:
             return self.inventory_iso14443A(**kwargs)
 
+
     def inventory_iso14443A(self):
         """
         By sending a 0xA0 command to the EVM module, the module will carry out
@@ -277,24 +278,57 @@ class PyDlpRfid2(object):
     def eeprom_read_multiple_block(self, uid, blocknum, blockoffset):
         if blocknum < 1:
             raise Exception("Blocknum can't be 0 or less")
-        response = self.issue_iso15693_command(cmd=DLP_CMD["REQUESTCMD"]["code"],
+        if uid is None:
+            response = self.issue_iso15693_command(cmd=DLP_CMD["REQUESTCMD"]["code"],
+                                   flags=flagsbyte(),
+                                   command_code='%02X'%M24LR64ER_CMD["READ_MULTIPLE_BLOCK"]["code"],
+                                   data='%02X%02X' % (blockoffset, blocknum - 1))
+        else:
+            response = self.issue_iso15693_command(cmd=DLP_CMD["REQUESTCMD"]["code"],
                                    flags=flagsbyte(address=True),
                                    command_code='%02X'%M24LR64ER_CMD["READ_MULTIPLE_BLOCK"]["code"],
                                    data=reverse_uid(uid) + '%02X%02X' % (blockoffset, blocknum - 1))
         return response
 
 
-    def eeprom_read_single_block(self, uid, blockoffset):
-        response = self.issue_iso15693_command(cmd=DLP_CMD["REQUESTCMD"]["code"],
-                                   flags=flagsbyte(address=True),
-                                   command_code='%02X'%M24LR64ER_CMD["READ_SINGLE_BLOCK"]["code"],
-                                   data=reverse_uid(uid) + '%02X00' % (blockoffset))
+    def eeprom_get_system_info(self, uid=None):
+        if uid is None:
+            response = self.issue_iso15693_command(cmd=DLP_CMD["REQUESTCMD"]["code"],
+                                flags=flagsbyte(),
+                                command_code='%02X'%M24LR64ER_CMD["GET_SYS_INFO"]["code"])
+        else:
+            response = self.issue_iso15693_command(cmd=DLP_CMD["REQUESTCMD"]["code"],
+                                flags=flagsbyte(address=True),
+                                command_code='%02X'%M24LR64ER_CMD["GET_SYS_INFO"]["code"],
+                                data=reverse_uid(uid))
         if len(response) == 1 and response[0] != '':
             return response[0]
         else:
             return None
 
 
+    def eeprom_read_single_block(self, uid, blockoffset):
+        if uid is None:
+            response = self.issue_iso15693_command(cmd=DLP_CMD["REQUESTCMD"]["code"],
+                                   flags=flagsbyte(),
+                                   command_code='%02X'%M24LR64ER_CMD["READ_SINGLE_BLOCK"]["code"],
+                                   data='%02X00' % (blockoffset))
+
+        else:
+            response = self.issue_iso15693_command(cmd=DLP_CMD["REQUESTCMD"]["code"],
+                                   flags=flagsbyte(address=True),
+                                   command_code='%02X'%M24LR64ER_CMD["READ_SINGLE_BLOCK"]["code"],
+                                   data=reverse_uid(uid) + '00%02X' % (blockoffset))
+        if len(response) == 1 and response[0] != '':
+            return response[0]
+        else:
+            return None
+
+    def eeprom_write_single_block(self, uid, block_offset, data):
+        if uid is None:
+            raise Exception("uid not supported yet")
+        else:
+            raise Exception("write not supported yet")
 
     def read_danish_model_tag(self, uid):
         # Command code 0x23: Read multiple blocks

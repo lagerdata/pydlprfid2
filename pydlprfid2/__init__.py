@@ -21,13 +21,17 @@ def usages():
     print("-r, --read=OFFSET        read one block (hex)")
     print("-s, --readmultiple=OFFSET:BLOCKNUM")
     print("                         read multiple block (hex:hex)")
+    print("-g, --getsysinfo         read eeprom info")
+    print("-w, --writesingle=OFFSET:DATA")
+    print("                         write data in one block")
 
 def main(argv):
     try:
-        opts, args = getopt.getopt(argv, "hd:p:lu:r:s:v",
+        opts, args = getopt.getopt(argv, "hd:p:lu:r:s:vgw:",
                   ["help", "devtty=", "protocol=",
                    "listtag", "uid=", "read=",
-                   "verbose", "readmultiple="])
+                   "verbose", "readmultiple=",
+                   "getsysinfo", "writesingle="])
     except getopt.GetoptError:
         usages()
         sys.exit(2)
@@ -39,6 +43,9 @@ def main(argv):
     blockoffset = None
     blocknum = None
     loglevel = logging.INFO
+    getsysinfo = False
+    writeoffset = None
+    writedata = None
     for opt, arg in opts:
         if opt in ["-h", "--help"]:
             usages()
@@ -64,6 +71,12 @@ def main(argv):
             stroffset, strblocknum = arg.split(":")
             blockoffset = int(stroffset, 16)
             blocknum = int(strblocknum, 16)
+        elif opt in ("-g", "--getsysinfo"):
+            getsysinfo = True
+        elif opt in ("-w", "--writesingle"):
+            stroffset, strdata = arg.split(":")
+            writeoffset = int(stroffset)
+            writedata = strdata
 
     if devtty is None:
         print("Wrong parameter: Give a devtty path")
@@ -85,17 +98,17 @@ def main(argv):
 
     if listtag:
         print("Looking for tags")
-        uids = list(reader.inventory())
+        uids = list(reader.inventory(single_slot=True))
         if len(uids) == 0:
             print("No tags found")
         else:
             print(f"{len(uids)} tags found")
             for uid, rssi in uids:
                 print(f"UID: {uid} RSSI: {rssi}")
+    elif getsysinfo:
+        values = reader.eeprom_get_system_info(uid)
+        print(values)
     elif blockoffset is not None:
-        if uid is None:
-            print("Please give the UID")
-            sys.exit(1)
         if blocknum is None:
             value = reader.eeprom_read_single_block(uid, blockoffset)
             print(f"Block 0x{blockoffset:02X} : {value}")
