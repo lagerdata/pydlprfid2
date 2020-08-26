@@ -381,9 +381,20 @@ class PyDlpRfid2(object):
 
     def eeprom_write_single_block(self, uid, block_offset, data):
         if uid is None:
-            raise Exception("uid not supported yet")
+            response = self.issue_iso15693_command(cmd=DLP_CMD["REQUESTCMD"]["code"],
+                                   flags=flagsbyte(protocol_extension=True),
+                                   command_code='%02X'%M24LR64ER_CMD["WRITE_SINGLE_BLOCK"]["code"],
+                                   data="%02X00" % (block_offset) + '01234567')
+
         else:
-            raise Exception("write not supported yet")
+            response = self.issue_iso15693_command(cmd=DLP_CMD["REQUESTCMD"]["code"],
+                                   flags=flagsbyte(address=True, protocol_extension=True),
+                                   command_code='%02X'%M24LR64ER_CMD["WRITE_SINGLE_BLOCK"]["code"],
+                                   data=reverse_uid(uid) + '%02X00' % (block_offset) + "01234567")
+        if len(response) == 1 and response[0] != '':
+            return response[0]
+        else:
+            return None
 
     def read_danish_model_tag(self, uid):
         # Command code 0x23: Read multiple blocks

@@ -122,6 +122,9 @@ def main(argv):
     elif getsysinfo:
         values = reader.eeprom_get_system_info(uid)
         print(values)
+    elif writeoffset is not None:
+        reader.eeprom_write_single_block(uid, writeoffset, writedata)
+        print("{} written at {}".format(writedata, writeoffset))
     elif blockoffset is not None:
         if blocknum is None:
             value = reader.eeprom_read_single_block(uid, blockoffset)
