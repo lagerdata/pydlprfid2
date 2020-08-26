@@ -365,16 +365,15 @@ class PyDlpRfid2(object):
     def eeprom_read_single_block(self, uid, blockoffset):
         if uid is None:
             response = self.issue_iso15693_command(cmd=DLP_CMD["REQUESTCMD"]["code"],
-                                   flags=flagsbyte(),
+                                   flags=flagsbyte(protocol_extension=True),
                                    command_code='%02X'%M24LR64ER_CMD["READ_SINGLE_BLOCK"]["code"],
-#                                   data='%02X00' % (blockoffset))
-                                   data='%02X' % (blockoffset))
+                                   data='%02X00' % (blockoffset))
 
         else:
             response = self.issue_iso15693_command(cmd=DLP_CMD["REQUESTCMD"]["code"],
-                                   flags=flagsbyte(address=True),
+                                   flags=flagsbyte(address=True, protocol_extension=True),
                                    command_code='%02X'%M24LR64ER_CMD["READ_SINGLE_BLOCK"]["code"],
-                                   data=reverse_uid(uid) + '00%02X' % (blockoffset))
+                                   data=reverse_uid(uid) + '%02X00' % (blockoffset))
         if len(response) == 1 and response[0] != '':
             return response[0]
         else:
