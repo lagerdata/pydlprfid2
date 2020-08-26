@@ -39,15 +39,15 @@ DLP_CMD = {
         "EXTERNANT": {"code": '2B', "desc": "Enable external antenna"},
         "GPIOMUX":   {"code": '2C', "desc": "GPIO multiplexer config"},
         "GPIOCFG":   {"code": '2D', "desc": "GPIO terminaison config"},
-       
-        "NFCT2CMD":   {"code": '72', "desc": "NFC Type 2 command"},
+
+        "NFCT2CMD":   {"code": '72', "desc": "NFC Type 2 command"},
 
         "REQA14443A": {"code": 'A0', "desc": "ISO14443A Anticollision REQA"},
         "WUPA14443A": {"code": 'A1', "desc": "ISO14443A Anticollision WUPA"},
         "SEL14443A":  {"code": 'A2', "desc": "ISO14443A Select"},
         "REQB14443A": {"code": 'B0', "desc": "ISO14443A Anticollision REQB"},
         "WUPB14443A": {"code": 'B1', "desc": "ISO14443A Anticollision WUPB"},
- 
+
         "AGCSEL":  {"code": 'F0', "desc": "AGC selection"},
         "AMPMSEL": {"code": 'F1', "desc": "AM/PM input selection"},
         "SETLED2": {"code": 'FB', "desc": "Set Led 2"},
@@ -69,6 +69,7 @@ DLP_CMD = {
 M24LR64ER_CMD = {
         "INVENTORY":           {"code": 0x01, "desc": "Inventory"},
         "QUIET":               {"code": 0x02, "desc": "Stay Quiet"},
+        "SET_READ_MODE_USER":  {"code": 0x10, "desc": "Set Read Mode to User Memory"},
         "READ_SINGLE_BLOCK":   {"code": 0x20, "desc": "Read Single Block"},
         "WRITE_SINGLE_BLOCK":  {"code": 0x21, "desc": "Write Single Block"},
         "READ_MULTIPLE_BLOCK": {"code": 0x23, "desc": "Read Multiple Block"},
@@ -171,6 +172,61 @@ class PyDlpRfid2(object):
         cmdstr = DLP_CMD["EXTERNANT"]["code"]
         self.issue_evm_command(cmd=cmdstr)
 
+    def enable_internal_antenna(self):
+        cmdstr = DLP_CMD["INTERNANT"]["code"]
+        self.issue_evm_command(cmd=cmdstr)
+
+    def init_kit(self):
+        initcmd = DLP_CMD["INITIALIZE"]["code"]
+        self.issue_evm_command(cmd=initcmd)  # Should return "TRF7970A EVM"
+
+    def debug_test(self):
+        print("DEBUG TEST:")
+        print("init (ping)")
+        self.init_kit()
+        print("enable internal antenna")
+        self.enable_internal_antenna()
+        print("enable external antenna")
+        self.enable_external_antenna()
+        print("Read UID from a Single ISO15693 Tag (Single-Slot Inventory):")
+        print(" Set ISO15693 Mode:")
+        self.set_iso15693()
+        print("AGC Toggle:")
+        self.issue_evm_command(cmd=DLP_CMD["AGCSEL"]["code"], prms='00')
+        print("AM/PM Toggle:")
+        self.issue_evm_command(cmd=DLP_CMD['AMPMSEL']["code"], prms='FF')
+        print("Single-Slot Inventory Request :")
+        self.inventory_iso15693(single_slot=True)
+        print("Read a Block from a Texas Instruments ISO15693 Tag:")
+        print(" Set Read Mode to User Memory:")
+        self.issue_iso15693_command(cmd=DLP_CMD["WRITESINGLE"]["code"],
+                                    flags=flagsbyte(),
+                                    command_code='%02X'%M24LR64ER_CMD["WRITE_SINGLE_BLOCK"]["code"],
+                                    data='0100')
+        print("AGC Toggle:")
+        self.issue_evm_command(cmd=DLP_CMD["AGCSEL"]["code"], prms='00')
+        print("AM/PM Toggle:")
+        self.issue_evm_command(cmd=DLP_CMD['AMPMSEL']["code"], prms='FF')
+
+        print("Read Block 4:")
+        self.issue_iso15693_command(cmd=DLP_CMD["REQUESTCMD"]["code"],
+                                   flags=flagsbyte(),
+                                   command_code='%02X'%M24LR64ER_CMD["READ_SINGLE_BLOCK"]["code"],
+                                   data='%02X' % (4))
+        print("Turn RF Carrier Off:")
+        self.issue_iso15693_command(cmd=DLP_CMD["WRITESINGLE"]["code"],
+                                    flags=flagsbyte(),
+                                    command_code='%02X'%M24LR64ER_CMD["INVENTORY"]["code"],
+                                    data='')
+        print("TODO")
+        print("")
+        print("End of debug")
+
+    def set_iso15693(self):
+        # Select protocol: 15693 with full power
+        self.issue_evm_command(cmd=DLP_CMD["WRITESINGLE"]["code"],
+                               prms='00210100')
+
     def set_protocol(self, protocol=ISO15693):
 
         self.protocol = protocol
@@ -271,7 +327,6 @@ class PyDlpRfid2(object):
 
     def get_dlp_rfid2_firmware_version(self):
         response = self.issue_evm_command(DLP_CMD["VERSION"]["code"], get_full_response=True)
-        print(response)
         return response
 
 
@@ -312,7 +367,8 @@ class PyDlpRfid2(object):
             response = self.issue_iso15693_command(cmd=DLP_CMD["REQUESTCMD"]["code"],
                                    flags=flagsbyte(),
                                    command_code='%02X'%M24LR64ER_CMD["READ_SINGLE_BLOCK"]["code"],
-                                   data='%02X00' % (blockoffset))
+#                                   data='%02X00' % (blockoffset))
+                                   data='%02X' % (blockoffset))
 
         else:
             response = self.issue_iso15693_command(cmd=DLP_CMD["REQUESTCMD"]["code"],
@@ -360,7 +416,6 @@ class PyDlpRfid2(object):
         # http://biblstandard.dk/rfid/dk/RFID_Data_Model_for_Libraries_February_2009.pdf
         version = response[0][0]    # not sure if this is really the way to do it
         if version != '0' and version != '1':
-            print(response)
             return {'error': 'unknown-version: %s' % version}
 
         usage_type = {
@@ -422,10 +477,7 @@ class PyDlpRfid2(object):
         crc = CRC().calculate(p)[::-1]
         data_bytes[19:21] = crc
 
-        print(data_bytes)
-
         for x in range(8):
-            print(data_bytes[x*4:x*4+4])
             attempt = 1
             while not self.write_block(uid, x, data_bytes[x*4:x*4+4]):
                 self.logger.warn('Attempt %d of %d: Write failed, retrying...' % (attempt, max_attempts))
@@ -438,7 +490,6 @@ class PyDlpRfid2(object):
 
     def write_blocks_to_card(self, uid, data_bytes, offset=0, nblocks=8):
         for x in range(offset, nblocks):
-            print(data_bytes[x*4:x*4+4])
             success = False
             attempts = 0
             max_attempts = 10
@@ -482,8 +533,6 @@ class PyDlpRfid2(object):
         p = [int(x, 16) for x in p1 + p2 + p3]
         crc = CRC().calculate(p)[::-1]
         data_bytes[19:21] = crc
-
-        print(data_bytes)
 
         return self.write_blocks_to_card(uid, data_bytes)
 

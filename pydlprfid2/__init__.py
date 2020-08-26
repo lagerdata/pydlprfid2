@@ -22,20 +22,22 @@ def usages():
     print("-s, --readmultiple=OFFSET:BLOCKNUM")
     print("                         read multiple block (hex:hex)")
     print("-g, --getsysinfo         read eeprom info")
+    print("-t, --test               launch debug test code")
     print("-w, --writesingle=OFFSET:DATA")
     print("                         write data in one block")
 
 def main(argv):
     try:
-        opts, args = getopt.getopt(argv, "hd:p:lu:r:s:vgw:",
+        opts, args = getopt.getopt(argv, "hd:p:lu:r:s:vgw:t",
                   ["help", "devtty=", "protocol=",
                    "listtag", "uid=", "read=",
                    "verbose", "readmultiple=",
+                   "test",
                    "getsysinfo", "writesingle="])
     except getopt.GetoptError:
         usages()
         sys.exit(2)
-    
+
     devtty = None
     listtag = False
     protocol=ISO15693
@@ -46,6 +48,7 @@ def main(argv):
     getsysinfo = False
     writeoffset = None
     writedata = None
+    debugtest = False
     for opt, arg in opts:
         if opt in ["-h", "--help"]:
             usages()
@@ -77,13 +80,16 @@ def main(argv):
             stroffset, strdata = arg.split(":")
             writeoffset = int(stroffset)
             writedata = strdata
+        elif opt in ("-t", "--test"):
+            debugtest = True
+
 
     if devtty is None:
         print("Wrong parameter: Give a devtty path")
         usages()
         sys.exit(2)
 
-    print("Initilize DLP")
+    print("Initilize the DLP")
     try:
         reader = PyDlpRfid2(serial_port=devtty, loglevel=loglevel)
     except serial.serialutil.SerialException:
@@ -93,12 +99,20 @@ def main(argv):
     if loglevel == logging.DEBUG: # get version only in debug messages level
         reader.get_dlp_rfid2_firmware_version()
 
+    if debugtest:
+        reader.debug_test()
+        sys.exit(0)
+
     reader.set_protocol(protocol)
     reader.enable_external_antenna()
 
     if listtag:
         print("Looking for tags")
-        uids = list(reader.inventory(single_slot=True))
+        ret = reader.inventory(single_slot=True)
+        if ret is not None:
+            uids = list([ret])
+        else:
+            uids = []
         if len(uids) == 0:
             print("No tags found")
         else:
