@@ -302,7 +302,7 @@ class PyDlpRfid2(object):
             uid = itm[:8]  # hex string, so each byte is two chars
 
             self.logger.debug('Found tag: %s (%s) ', uid, itm[8:])
-            yield uid
+            return uid
 
             # See https://github.com/nfc-tools/libnfc/blob/master/examples/nfc-anticol.c
 
@@ -323,7 +323,7 @@ class PyDlpRfid2(object):
                     uid = itm[0]
                     rssi = itm[1]
                     self.logger.debug('Found tag: %s (%s) ', uid, rssi)
-                    yield reverse_uid(uid), rssi
+                    return reverse_uid(uid), rssi
 
     def get_dlp_rfid2_firmware_version(self):
         response = self.issue_evm_command(DLP_CMD["VERSION"]["code"], get_full_response=True)
