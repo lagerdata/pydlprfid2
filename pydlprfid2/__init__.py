@@ -19,8 +19,11 @@ def usages():
     print("-l, --listtag            list tag present")
     print("-u, --uid=UID            give UID to access")
     print("-r, --read=OFFSET        read one block (hex)")
-    print("-s, --readmultiple=OFFSET:BLOCKNUM")
-    print("                         read multiple block (hex:hex)")
+    print("-m, --readmultiple=NBR:OFFSET")
+    print("                         read multiple blocks (hex:hex)")
+    print('-M, --writemultiple=OFFSET:"DATA0,DATA1,..."')
+    print("                         write multiple blocks (hex).")
+    print("                         note: this will be multiple single access")
     print("-g, --getsysinfo         read eeprom info")
     print("-t, --test               launch debug test code")
     print("-w, --writesingle=OFFSET:DATA")
@@ -28,11 +31,11 @@ def usages():
 
 def main(argv):
     try:
-        opts, args = getopt.getopt(argv, "hd:p:lu:r:s:vgw:t",
+        opts, args = getopt.getopt(argv, "hd:p:lu:r:m:M:vgw:t",
                   ["help", "devtty=", "protocol=",
                    "listtag", "uid=", "read=",
                    "verbose", "readmultiple=",
-                   "test",
+                   "writemultiple=", "test",
                    "getsysinfo", "writesingle="])
     except getopt.GetoptError:
         usages()
@@ -44,6 +47,7 @@ def main(argv):
     uid = None
     blockoffset = None
     blocknum = None
+    dataliststr = None
     loglevel = logging.INFO
     getsysinfo = False
     writeoffset = None
@@ -70,10 +74,15 @@ def main(argv):
             blockoffset = int(arg, 16)
         elif opt in ["-v", "--verbose"]:
             loglevel = logging.DEBUG
-        elif opt in ("-s", "--readmultiple"):
-            stroffset, strblocknum = arg.split(":")
+        elif opt in ("-m", "--readmultiple"):
+            strblocknum, stroffset = arg.split(":")
             blockoffset = int(stroffset, 16)
             blocknum = int(strblocknum, 16)
+        elif opt in ("-M", "--writemultiple"):
+            stroffset, strdata = arg.split(":")
+            blockoffset = int(stroffset, 16)
+            dataliststr = strdata.replace("[", "").replace("]", "").split(",") 
+            blocknum = len(dataliststr)
         elif opt in ("-g", "--getsysinfo"):
             getsysinfo = True
         elif opt in ("-w", "--writesingle"):
@@ -125,11 +134,15 @@ def main(argv):
     elif writeoffset is not None:
         reader.eeprom_write_single_block(uid, writeoffset, writedata)
         print("{} written at {}".format(writedata, writeoffset))
-    elif blockoffset is not None:
+    elif blockoffset is not None and dataliststr is None:
         if blocknum is None:
             value = reader.eeprom_read_single_block(uid, blockoffset)
             print(f"Block 0x{blockoffset:02X} : {value}")
         else:
             values = reader.eeprom_read_multiple_block(uid, blocknum, blockoffset)
-            print(f"{values}")
+            print(f"Block 0x{blockoffset:04X} to 0x{(blockoffset+(blocknum-1)):04X} : {values}")
+    elif blockoffset is not None and dataliststr is not None:
+        datalist = [int(vstr, 16) for vstr in dataliststr]
+        value = reader.eeprom_write_multiple_block(uid, blockoffset, datalist)
+        print(f"Block 0x{blockoffset:04X} to 0x{(blockoffset+(blocknum-1)):04X} written")
 

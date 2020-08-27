@@ -18,6 +18,8 @@ except ImportError:
 
 from .crc import CRC
 
+class StandardError(Exception):
+    pass
 
 ISO15693 = 'ISO15693'
 ISO14443A = 'ISO14443A'
@@ -330,22 +332,6 @@ class PyDlpRfid2(object):
         return response
 
 
-    def eeprom_read_multiple_block(self, uid, blocknum, blockoffset):
-        if blocknum < 1:
-            raise Exception("Blocknum can't be 0 or less")
-        if uid is None:
-            response = self.issue_iso15693_command(cmd=DLP_CMD["REQUESTCMD"]["code"],
-                                   flags=flagsbyte(),
-                                   command_code='%02X'%M24LR64ER_CMD["READ_MULTIPLE_BLOCK"]["code"],
-                                   data='%02X%02X' % (blockoffset, blocknum - 1))
-        else:
-            response = self.issue_iso15693_command(cmd=DLP_CMD["REQUESTCMD"]["code"],
-                                   flags=flagsbyte(address=True),
-                                   command_code='%02X'%M24LR64ER_CMD["READ_MULTIPLE_BLOCK"]["code"],
-                                   data=reverse_uid(uid) + '%02X%02X' % (blockoffset, blocknum - 1))
-        return response
-
-
     def eeprom_get_system_info(self, uid=None):
         if uid is None:
             response = self.issue_iso15693_command(cmd=DLP_CMD["REQUESTCMD"]["code"],
@@ -363,39 +349,79 @@ class PyDlpRfid2(object):
 
 
     def eeprom_read_single_block(self, uid, blockoffset):
-        if uid is None:
-            response = self.issue_iso15693_command(cmd=DLP_CMD["REQUESTCMD"]["code"],
-                                   flags=flagsbyte(protocol_extension=True),
-                                   command_code='%02X'%M24LR64ER_CMD["READ_SINGLE_BLOCK"]["code"],
-                                   data='%02X00' % (blockoffset))
-
+        address = False
+        data='%02X%02X' % (blockoffset&0xFF, (blockoffset>>8)&0xFF)
+        if uid is not None:
+            data = reverse_uid(uid) + data
+            address = True
+        response = self.issue_iso15693_command(cmd=DLP_CMD["REQUESTCMD"]["code"],
+                           flags=flagsbyte(address=address, protocol_extension=True),
+                           command_code='%02X'%M24LR64ER_CMD["READ_SINGLE_BLOCK"]["code"],
+                           data=data)
+        if len(response) == 1 and response[0] != '':
+            resp = response[0]
+            if resp[0:2] == '00':
+                return resp[2:8]
+            else:
+                raise StandardError("Wrong code return {} ({})".format(resp[0:2], resp))
         else:
-            response = self.issue_iso15693_command(cmd=DLP_CMD["REQUESTCMD"]["code"],
-                                   flags=flagsbyte(address=True, protocol_extension=True),
-                                   command_code='%02X'%M24LR64ER_CMD["READ_SINGLE_BLOCK"]["code"],
-                                   data=reverse_uid(uid) + '%02X00' % (blockoffset))
+            return None
+
+    def eeprom_read_multiple_block(self, uid, blocknum, blockoffset):
+        address = False
+        if blocknum < 1:
+            raise Exception("Blocknum can't be 0 or less")
+        data='%02X%02X%02X' % (blockoffset&0xff, (blockoffset>>8)&0xff, blocknum-1)
+        if uid is not None:
+            address = True
+            data = reverse_uid(uid) + data
+        response = self.issue_iso15693_command(cmd=DLP_CMD["REQUESTCMD"]["code"],
+                    flags=flagsbyte(address=address, protocol_extension=True),
+                    command_code='%02X'%M24LR64ER_CMD["READ_MULTIPLE_BLOCK"]["code"],
+                    data=data)
+        if len(response) == 1 and response[0] != '':
+            resp = response[0]
+            if resp[0:2] == '00':
+                return resp[2:]
+            else:
+                raise StandardError("Wrong code return {} ({})".format(resp[0:2], resp))
+        else:
+            return None
+
+    def eeprom_write_single_block(self, uid, block_offset, datastr):
+        address = False
+        if len(datastr) > 8:
+            raise StandardError("Data too long")
+        try:
+            datavalue = "{:08X}".format(int(datastr, 16))
+        except ValueError:
+            raise StandardError("Data is not correct hexadecimal value")
+
+        data = "%02X%02X" % (block_offset&0xff, (block_offset>>8)&0xff) + datavalue
+        if uid is not None:
+            address = True
+            data = reverse_uid(uid) + data
+
+        response = self.issue_iso15693_command(cmd=DLP_CMD["REQUESTCMD"]["code"],
+                 flags=flagsbyte(address=address, protocol_extension=True),
+                 command_code='%02X'%M24LR64ER_CMD["WRITE_SINGLE_BLOCK"]["code"],
+                 data=data)
         if len(response) == 1 and response[0] != '':
             return response[0]
         else:
             return None
 
-    def eeprom_write_single_block(self, uid, block_offset, data):
-        if uid is None:
-            response = self.issue_iso15693_command(cmd=DLP_CMD["REQUESTCMD"]["code"],
-                                   flags=flagsbyte(protocol_extension=True),
-                                   command_code='%02X'%M24LR64ER_CMD["WRITE_SINGLE_BLOCK"]["code"],
-                                   data="%02X00" % (block_offset) + '01234567')
-
-        else:
-            response = self.issue_iso15693_command(cmd=DLP_CMD["REQUESTCMD"]["code"],
-                                   flags=flagsbyte(address=True, protocol_extension=True),
-                                   command_code='%02X'%M24LR64ER_CMD["WRITE_SINGLE_BLOCK"]["code"],
-                                   data=reverse_uid(uid) + '%02X00' % (block_offset) + "01234567")
-        if len(response) == 1 and response[0] != '':
-            return response[0]
-        else:
-            return None
-
+    def eeprom_write_multiple_block(self, uid, block_offset, datalist):
+        offset = block_offset
+        resplist = []
+        for data in datalist:
+            resp = self.eeprom_write_single_block(uid, offset, "{:08X}".format(data))
+            offset = offset + 1
+            if resp is None:
+                raise StandardError("Writing error on data {:08X}".format(data))
+            resplist.append(resp)
+        return resplist
+ 
     def read_danish_model_tag(self, uid):
         # Command code 0x23: Read multiple blocks
         block_offset = 0
