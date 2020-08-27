@@ -59,28 +59,28 @@ To list tag present, use `-l` option :
 ## Reading
 
 - read block 1 of eeprom with uid E0025E167B532A87 :
-
+```
     $ pdr2 -d/dev/ttyACM0 -r1 -uE0025E167B532A87
     Initilize the DLP
     Block 0x01 : 012345
-
+```
 - read 4 block from 0 with uid E0025E167B532A87 :
-
+```
     $ pdr2 -d/dev/ttyACM0 -m4:0 -uE0025E167B532A87
     Initilize the DLP
     Block 0x0000 to 0x0003 : FFFFFFFF01234567FFFFFFFFFFFFFFFF
-
+```
 ## Writing
 
-- write block 1 of eeprom with uid E0025E167B532A87 :
-
+- write blocks 1 of eeprom with uid E0025E167B532A87 :
+```
     $ pdr2 -d/dev/ttyACM0 -w2:76543210 -uE0025E167B532A87
     Initilize the DLP
     76543210 written at 2
-
+```
 - write 4 blocks begin at block 4 with uid E0025E167B532A87 :
-
+```
     $ pdr2 -d/dev/ttyACM0 -M0:"00000000, 11111111, 22222222, AAAAAAAA, EEEEEEEE" -uE0025E167B532A87
     Initilize the DLP
     Block 0x0000 to 0x0004 written
-
+```
