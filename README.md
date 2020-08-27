@@ -43,6 +43,16 @@ A second binary come with this package to convert BusPirate to a standard USB-UA
     $  bp2bridge -d/dev/ttyACM0
     /dev/ttyACM0 is now configured as standard tty uart (115200)
 
+# List tag
+
+To list tag present, use `-l` option :
+
+    $ pdr2 -d/dev/ttyACM0 -l
+    Initilize the DLP
+    Looking for tags
+    1 tags found
+    UID: E0025E167B532A87 RSSI: 6D
+
 
 # EEPROM access
 
