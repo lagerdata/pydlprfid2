@@ -18,6 +18,7 @@ def usages():
     print("-p, --protocol=PROTOCOL  default ISO15693")
     print("-l, --listtag            list tag present")
     print("-u, --uid=UID            give UID to access")
+    print("-i, --internal           enable internal antenna")
     print("-r, --read=OFFSET        read one block (hex)")
     print("-m, --readmultiple=NBR:OFFSET")
     print("                         read multiple blocks (hex:hex)")
@@ -31,11 +32,11 @@ def usages():
 
 def main(argv):
     try:
-        opts, args = getopt.getopt(argv, "hd:p:lu:r:m:M:vgw:t",
+        opts, args = getopt.getopt(argv, "hd:p:lu:r:m:M:vgw:ti",
                   ["help", "devtty=", "protocol=",
                    "listtag", "uid=", "read=",
                    "verbose", "readmultiple=",
-                   "writemultiple=", "test",
+                   "writemultiple=", "test", "internal",
                    "getsysinfo", "writesingle="])
     except getopt.GetoptError:
         usages()
@@ -53,6 +54,7 @@ def main(argv):
     writeoffset = None
     writedata = None
     debugtest = False
+    internal = False
     for opt, arg in opts:
         if opt in ["-h", "--help"]:
             usages()
@@ -83,6 +85,8 @@ def main(argv):
             blockoffset = int(stroffset, 16)
             dataliststr = strdata.replace("[", "").replace("]", "").split(",") 
             blocknum = len(dataliststr)
+        elif opt in ("-i", "--internal"):
+            internal = True
         elif opt in ("-g", "--getsysinfo"):
             getsysinfo = True
         elif opt in ("-w", "--writesingle"):
@@ -114,6 +118,8 @@ def main(argv):
 
     reader.set_protocol(protocol)
     reader.enable_external_antenna()
+    if internal:
+        reader.enable_internal_antenna()
 
     if listtag:
         print("Looking for tags")

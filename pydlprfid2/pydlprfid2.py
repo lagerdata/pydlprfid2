@@ -16,8 +16,6 @@ except ImportError:
     def colored(msg, *args, **kwargs):
         return msg
 
-from .crc import CRC
-
 class StandardError(Exception):
     pass
 
