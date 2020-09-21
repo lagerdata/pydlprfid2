@@ -359,7 +359,7 @@ class PyDlpRfid2(object):
         if len(response) == 1 and response[0] != '':
             resp = response[0]
             if resp[0:2] == '00':
-                return resp[2:8]
+                return resp[2:10]
             else:
                 raise StandardError("Wrong code return {} ({})".format(resp[0:2], resp))
         else:
