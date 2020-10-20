@@ -6,7 +6,7 @@ from setuptools import setup
 
 setup(
     name='pydlprfid2',
-    version='0.3',
+    version='0.4',
 
     description='Drive DLP RFID2 reader to read/write EEPROM',
     long_description='pyrfidgeek fork that drive DLP RFID2 reader to read/write EEPROM',
