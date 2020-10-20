@@ -91,11 +91,10 @@ def main(argv):
             getsysinfo = True
         elif opt in ("-w", "--writesingle"):
             stroffset, strdata = arg.split(":")
-            writeoffset = int(stroffset)
+            writeoffset = int(stroffset, 16)
             writedata = strdata
         elif opt in ("-t", "--test"):
             debugtest = True
-
 
     if devtty is None:
         print("Wrong parameter: Give a devtty path")
