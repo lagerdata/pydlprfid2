@@ -386,7 +386,7 @@ class PyDlpRfid2(object):
         else:
             return None
 
-    def eeprom_write_single_block(self, uid, block_offset, datastr):
+    def eeprom_write_single_block(self, uid, block_offset, datastr, readback=True):
         address = False
         if len(datastr) > 8:
             raise StandardError("Data too long")
@@ -404,6 +404,10 @@ class PyDlpRfid2(object):
                  flags=flagsbyte(address=address, protocol_extension=True),
                  command_code='%02X'%M24LR64ER_CMD["WRITE_SINGLE_BLOCK"]["code"],
                  data=data)
+        if readback:
+            block_value = self.eeprom_read_single_block(uid, block_offset)
+            if block_value != datastr:
+                raise Exception("Write error on block {}".format(block_offset))
         if len(response) == 1 and response[0] != '':
             return response[0]
         else:
