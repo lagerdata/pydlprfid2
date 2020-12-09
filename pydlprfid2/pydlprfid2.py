@@ -407,7 +407,8 @@ class PyDlpRfid2(object):
         if readback:
             block_value = self.eeprom_read_single_block(uid, block_offset)
             if block_value != datastr:
-                raise Exception("Write error on block {}".format(block_offset))
+                raise Exception("Write error on block {}: read {} instead of {}"
+                        .format(block_offset, block_value, datastr))
         if len(response) == 1 and response[0] != '':
             return response[0]
         else:
