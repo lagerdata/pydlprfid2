@@ -1,0 +1,7 @@
+#! /usr/bin/env python
+# -*- coding: utf-8 -*-
+
+from pydlprfid2 import ntag_interface
+import sys
+
+ntag_interface.ntag_interface_start(sys.argv[1:])

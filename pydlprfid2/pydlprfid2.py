@@ -25,7 +25,7 @@ ISO14443B = 'ISO14443B'
 
 # sloa157.pdf Table 4 «HOST (PC GUI to MCU)» page 18
 DLP_CMD = {
-        "DIRECTMODE": {"code": '0F', "desc": "Direct mode"},
+        "DIRECTMODE":   {"code": '0F', "desc": "Direct mode"},
         "WRITESINGLE":  {"code": '10', "desc": "Write single"},
         "WRITECONTINU": {"code": '11', "desc": "Write Continuous"},
         "READSINGLE":   {"code": '12', "desc": "Read single"},
@@ -66,36 +66,35 @@ DLP_CMD = {
 
 
 # commands codes from datasheet m24lr64e-r.pdf page 78
-M24LR64ER_CMD = {
-        "INVENTORY":           {"code": 0x01, "desc": "Inventory"},
-        "QUIET":               {"code": 0x02, "desc": "Stay Quiet"},
-        "SET_READ_MODE_USER":  {"code": 0x10, "desc": "Set Read Mode to User Memory"},
-        "READ_SINGLE_BLOCK":   {"code": 0x20, "desc": "Read Single Block"},
-        "WRITE_SINGLE_BLOCK":  {"code": 0x21, "desc": "Write Single Block"},
-        "READ_MULTIPLE_BLOCK": {"code": 0x23, "desc": "Read Multiple Block"},
-        "SELECT":              {"code": 0x25, "desc": "Select"},
-        "RESET_TO_READY":      {"code": 0x26, "desc": "Reset to Ready"},
-        "WRITE_AFI":           {"code": 0x27, "desc": "Write AFI"},
-        "LOCK_AFI":            {"code": 0x28, "desc": "Lock AFI"},
-        "WRITE_DSFID":         {"code": 0x29, "desc": "Write DSFID"},
-        "LOCK_DSFID":          {"code": 0x2A, "desc": "Lock DSFID"},
-        "GET_SYS_INFO":        {"code": 0x2B, "desc": "Get System Info"},
+NTAG5_CMD = {
+        "INVENTORY":                {"code": 0x01, "desc": "Inventory"},
+        "QUIET":                    {"code": 0x02, "desc": "Stay Quiet"},
+        "READ_SINGLE_BLOCK":        {"code": 0x20, "desc": "Read Single Block"},
+        "WRITE_SINGLE_BLOCK":       {"code": 0x21, "desc": "Write Single Block"},
+        "LOCK_BLOCK":               {"code": 0x22, "desc": "Lock Block"},
+        "READ_MULTIPLE_BLOCK":      {"code": 0x23, "desc": "Read Multiple Block"},
+        "SELECT":                   {"code": 0x25, "desc": "Select"},
+        "RESET_TO_READY":           {"code": 0x26, "desc": "Reset to Ready"},
+        "WRITE_AFI":                {"code": 0x27, "desc": "Write AFI"},
+        "LOCK_AFI":                 {"code": 0x28, "desc": "Lock AFI"},
+        "WRITE_DSFID":              {"code": 0x29, "desc": "Write DSFID"},
+        "LOCK_DSFID":               {"code": 0x2A, "desc": "Lock DSFID"},
+        "GET_SYS_INFO":             {"code": 0x2B, "desc": "Get System Info"},
+        "GET_MULT_BLOC_SEC_INFO":   {"code": 0x2C, "desc": "Get Multiple Block Security Status"},
+        
+        "READ_CONF":                {"code": 0xC0, "desc": "Read Configuration"},
+        "WRITE_CONF":               {"code": 0xC1, "desc": "Write Configuration"},
+        "READ_SRAM":                {"code": 0xD2, "desc": "Read SRAM"},
+        "WRITE_SRAM":               {"code": 0xD3, "desc": "Write SRAM"},
+        }
 
-        "GET_MULT_BLOC_SEC_INFO":{"code": 0x2C, "desc": "Get Multiple Block Security Status"},
-        "WRITE_SECT_PSWD":   {"code": 0xB1, "desc": "Write-sector Password"},
-        "LOCK_SECT_PSWD":    {"code": 0xB2, "desc": "Lock-sector"},
-        "PRESENT_SECT_PSWD": {"code": 0xB3, "desc": "Present-sector Password"},
-        "FAST_READ_SINGLE_BLOCK": {"code": 0xC0, "desc": "Fast Read Single Block"},
-        "FAST_INVENTORY_INIT":    {"code": 0xC1, "desc": "Fast Inventory Initiated"},
-        "FAST_INIT":              {"code": 0xC2, "desc": "Fast Initiate"},
-        "FAST_READ_MULT_BLOCK":   {"code": 0xC3, "desc": "Fast Read Multiple Block"},
-        "INVENTORY_INIT":         {"code": 0xD1, "desc": "Inventory Initiated"},
-        "INITIATE":               {"code": 0xD2, "desc": "Initiate"},
-        "READCFG": {"code": 0xA0, "desc": "ReadCfg"},
-        "WRITEEHCFG": {"code": 0xA1, "desc": "WriteEHCfg"},
-        "SETRSTEHEN": {"code": 0xA2, "desc": "SetRstEHEn"},
-        "CHECKEHEN" : {"code": 0xA3, "desc": "CheckEHEn"},
-        "WRITEDOCFG": {"code": 0xA4, "desc": "WriteDOCfg"}
+NTAG5_ADDR = {
+        "SRAM_START":   {"address": 0x00, "desc": "First address of SRAM"},
+        "SRAM_END":     {"address": 0x3F, "desc": "Last address of SRAM"},
+
+        "STATUS_REG":   {"address": 0xA0, "desc": "Status Register"},
+        "EH_CONFIG_REG":{"address": 0xA7, "desc": "Energy Harvesting Config Register"},
+        "ED_CONFIG_REG":{"address": 0xA8, "desc": "Event Detection Config Register"},
         }
 
 def reverse_uid(uid):
@@ -201,24 +200,13 @@ class PyDlpRfid2(object):
         print(" Set Read Mode to User Memory:")
         self.issue_iso15693_command(cmd=DLP_CMD["WRITESINGLE"]["code"],
                                     flags=flagsbyte(),
-                                    command_code='%02X'%M24LR64ER_CMD["WRITE_SINGLE_BLOCK"]["code"],
+                                    command_code='%02X'%NTAG5_CMD["WRITE_SINGLE_BLOCK"]["code"],
                                     data='0100')
         print("AGC Toggle:")
         self.issue_evm_command(cmd=DLP_CMD["AGCSEL"]["code"], prms='00')
         print("AM/PM Toggle:")
         self.issue_evm_command(cmd=DLP_CMD['AMPMSEL']["code"], prms='FF')
 
-        print("Read Block 4:")
-        self.issue_iso15693_command(cmd=DLP_CMD["REQUESTCMD"]["code"],
-                                   flags=flagsbyte(),
-                                   command_code='%02X'%M24LR64ER_CMD["READ_SINGLE_BLOCK"]["code"],
-                                   data='%02X' % (4))
-        print("Turn RF Carrier Off:")
-        self.issue_iso15693_command(cmd=DLP_CMD["WRITESINGLE"]["code"],
-                                    flags=flagsbyte(),
-                                    command_code='%02X'%M24LR64ER_CMD["INVENTORY"]["code"],
-                                    data='')
-        print("TODO")
         print("")
         print("End of debug")
 
@@ -312,7 +300,7 @@ class PyDlpRfid2(object):
         response = self.issue_iso15693_command(cmd=DLP_CMD["ANTICOL15693"]["code"],
                                                flags=flagsbyte(inventory=True,
                                                                single_slot=single_slot),
-                                               command_code='%02X'%M24LR64ER_CMD["INVENTORY"]["code"],
+                                               command_code='%02X'%NTAG5_CMD["INVENTORY"]["code"],
                                                data='00')
         for itm in response:
             itm = itm.split(',')
@@ -334,11 +322,11 @@ class PyDlpRfid2(object):
         if uid is None:
             response = self.issue_iso15693_command(cmd=DLP_CMD["REQUESTCMD"]["code"],
                                 flags=flagsbyte(),
-                                command_code='%02X'%M24LR64ER_CMD["GET_SYS_INFO"]["code"])
+                                command_code='%02X'%NTAG5_CMD["GET_SYS_INFO"]["code"])
         else:
             response = self.issue_iso15693_command(cmd=DLP_CMD["REQUESTCMD"]["code"],
                                 flags=flagsbyte(address=True),
-                                command_code='%02X'%M24LR64ER_CMD["GET_SYS_INFO"]["code"],
+                                command_code='%02X'%NTAG5_CMD["GET_SYS_INFO"]["code"],
                                 data=reverse_uid(uid))
         if len(response) == 1 and response[0] != '':
             return response[0]
@@ -354,7 +342,7 @@ class PyDlpRfid2(object):
             address = True
         response = self.issue_iso15693_command(cmd=DLP_CMD["REQUESTCMD"]["code"],
                            flags=flagsbyte(address=address, protocol_extension=True),
-                           command_code='%02X'%M24LR64ER_CMD["READ_SINGLE_BLOCK"]["code"],
+                           command_code='%02X'%NTAG5_CMD["READ_SINGLE_BLOCK"]["code"],
                            data=data)
         if len(response) == 1 and response[0] != '':
             resp = response[0]
@@ -375,7 +363,7 @@ class PyDlpRfid2(object):
             data = reverse_uid(uid) + data
         response = self.issue_iso15693_command(cmd=DLP_CMD["REQUESTCMD"]["code"],
                     flags=flagsbyte(address=address, protocol_extension=True),
-                    command_code='%02X'%M24LR64ER_CMD["READ_MULTIPLE_BLOCK"]["code"],
+                    command_code='%02X'%NTAG5_CMD["READ_MULTIPLE_BLOCK"]["code"],
                     data=data)
         if len(response) == 1 and response[0] != '':
             resp = response[0]
@@ -402,7 +390,7 @@ class PyDlpRfid2(object):
 
         response = self.issue_iso15693_command(cmd=DLP_CMD["REQUESTCMD"]["code"],
                  flags=flagsbyte(address=address, protocol_extension=True),
-                 command_code='%02X'%M24LR64ER_CMD["WRITE_SINGLE_BLOCK"]["code"],
+                 command_code='%02X'%NTAG5_CMD["WRITE_SINGLE_BLOCK"]["code"],
                  data=data)
         if readback:
             block_value = self.eeprom_read_single_block(uid, block_offset)
@@ -451,7 +439,7 @@ class PyDlpRfid2(object):
 
         response = self.issue_iso15693_command(cmd=DLP_CMD["REQUESTCMD"]["code"],
                                                flags=flagsbyte(address=True),  # 32 (dec) <-> 20 (hex)
-                                               command_code='%02X'%M24LR64ER_CMD["WRITE_SINGLE_BLOCK"]["code"],
+                                               command_code='%02X'%NTAG5_CMD["WRITE_SINGLE_BLOCK"]["code"],
                                                data='%s%02X%s' % (uid, block_number, ''.join(data)))
         if response[0] == '00':
             self.logger.debug('Wrote block %d successfully', block_number)
@@ -464,7 +452,7 @@ class PyDlpRfid2(object):
                                     flags=flagsbyte(address=False,
                                                     high_data_rate=True,
                                                     option=False),  # 32 (dec) <-> 20 (hex)
-                                    command_code='%02X'%M24LR64ER_CMD["WRITE_AFI"]["code"],
+                                    command_code='%02X'%NTAG5_CMD["WRITE_AFI"]["code"],
                                     data='C2')
 
     def lock_afi(self, uid):
@@ -472,7 +460,7 @@ class PyDlpRfid2(object):
                                     flags=flagsbyte(address=False,
                                                     high_data_rate=False,
                                                     option=False),  # 32 (dec) <-> 20 (hex)
-                                    command_code='%02X'%M24LR64ER_CMD["WRITE_AFI"]["code"],
+                                    command_code='%02X'%NTAG5_CMD["WRITE_AFI"]["code"],
                                     data='07')
 
     def issue_evm_command(self, cmd, prms='', get_full_response=False):
@@ -507,6 +495,8 @@ class PyDlpRfid2(object):
             return self.get_response(response)
 
     def issue_iso15693_command(self, cmd, flags='', command_code='', data=''):
+        if cmd == DLP_CMD["REQUESTCMD"]["code"] and int(command_code, 16) > 0x2C:
+            data = "04"+data #add manuf_code to command data
         return self.issue_evm_command(cmd, flags + command_code + data)
 
     def flush(self):
