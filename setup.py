@@ -29,7 +29,7 @@ setup(
     ],
 
     packages=['pydlprfid2'],
-    scripts=['bin/pdr2', 'bin/bp2bridge'],
+    scripts=['bin/pdr2', 'bin/bp2bridge', 'bin/ntagif'],
 
     # Run-time dependencies
     install_requires=['pyserial'],
