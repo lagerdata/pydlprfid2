@@ -158,7 +158,7 @@ class PyDlpRfid2(object):
         ch = logging.StreamHandler()
         ch.setLevel(loglevel)
         # create formatter
-        formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+        formatter = logging.Formatter('%(name)s - %(levelname)s - %(message)s')
         # add formatter to ch
         ch.setFormatter(formatter)
 
@@ -200,7 +200,7 @@ class PyDlpRfid2(object):
         print(" Set Read Mode to User Memory:")
         self.issue_iso15693_command(cmd=DLP_CMD["WRITESINGLE"]["code"],
                                     flags=flagsbyte(),
-                                    command_code='%02X'%NTAG5_CMD["WRITE_SINGLE_BLOCK"]["code"],
+                                    command_code=NTAG5_CMD["WRITE_SINGLE_BLOCK"]["code"],
                                     data='0100')
         print("AGC Toggle:")
         self.issue_evm_command(cmd=DLP_CMD["AGCSEL"]["code"], prms='00')
@@ -300,7 +300,7 @@ class PyDlpRfid2(object):
         response = self.issue_iso15693_command(cmd=DLP_CMD["ANTICOL15693"]["code"],
                                                flags=flagsbyte(inventory=True,
                                                                single_slot=single_slot),
-                                               command_code='%02X'%NTAG5_CMD["INVENTORY"]["code"],
+                                               command_code=NTAG5_CMD["INVENTORY"]["code"],
                                                data='00')
         for itm in response:
             itm = itm.split(',')
@@ -310,7 +310,7 @@ class PyDlpRfid2(object):
                 if len(itm[0]) == 16:
                     uid = itm[0]
                     rssi = itm[1]
-                    self.logger.debug('Found tag: %s (%s) ', uid, rssi)
+                    self.logger.info('Found tag: %s (%s) ', uid, rssi)
                     return reverse_uid(uid), rssi
 
     def get_dlp_rfid2_firmware_version(self):
@@ -322,11 +322,11 @@ class PyDlpRfid2(object):
         if uid is None:
             response = self.issue_iso15693_command(cmd=DLP_CMD["REQUESTCMD"]["code"],
                                 flags=flagsbyte(),
-                                command_code='%02X'%NTAG5_CMD["GET_SYS_INFO"]["code"])
+                                command_code=NTAG5_CMD["GET_SYS_INFO"]["code"])
         else:
             response = self.issue_iso15693_command(cmd=DLP_CMD["REQUESTCMD"]["code"],
                                 flags=flagsbyte(address=True),
-                                command_code='%02X'%NTAG5_CMD["GET_SYS_INFO"]["code"],
+                                command_code=NTAG5_CMD["GET_SYS_INFO"]["code"],
                                 data=reverse_uid(uid))
         if len(response) == 1 and response[0] != '':
             return response[0]
@@ -342,7 +342,7 @@ class PyDlpRfid2(object):
             address = True
         response = self.issue_iso15693_command(cmd=DLP_CMD["REQUESTCMD"]["code"],
                            flags=flagsbyte(address=address, protocol_extension=True),
-                           command_code='%02X'%NTAG5_CMD["READ_SINGLE_BLOCK"]["code"],
+                           command_code=NTAG5_CMD["READ_SINGLE_BLOCK"]["code"],
                            data=data)
         if len(response) == 1 and response[0] != '':
             resp = response[0]
@@ -363,7 +363,7 @@ class PyDlpRfid2(object):
             data = reverse_uid(uid) + data
         response = self.issue_iso15693_command(cmd=DLP_CMD["REQUESTCMD"]["code"],
                     flags=flagsbyte(address=address, protocol_extension=True),
-                    command_code='%02X'%NTAG5_CMD["READ_MULTIPLE_BLOCK"]["code"],
+                    command_code=NTAG5_CMD["READ_MULTIPLE_BLOCK"]["code"],
                     data=data)
         if len(response) == 1 and response[0] != '':
             resp = response[0]
@@ -390,7 +390,7 @@ class PyDlpRfid2(object):
 
         response = self.issue_iso15693_command(cmd=DLP_CMD["REQUESTCMD"]["code"],
                  flags=flagsbyte(address=address, protocol_extension=True),
-                 command_code='%02X'%NTAG5_CMD["WRITE_SINGLE_BLOCK"]["code"],
+                 command_code=NTAG5_CMD["WRITE_SINGLE_BLOCK"]["code"],
                  data=data)
         if readback:
             block_value = self.eeprom_read_single_block(uid, block_offset)
@@ -439,7 +439,7 @@ class PyDlpRfid2(object):
 
         response = self.issue_iso15693_command(cmd=DLP_CMD["REQUESTCMD"]["code"],
                                                flags=flagsbyte(address=True),  # 32 (dec) <-> 20 (hex)
-                                               command_code='%02X'%NTAG5_CMD["WRITE_SINGLE_BLOCK"]["code"],
+                                               command_code=NTAG5_CMD["WRITE_SINGLE_BLOCK"]["code"],
                                                data='%s%02X%s' % (uid, block_number, ''.join(data)))
         if response[0] == '00':
             self.logger.debug('Wrote block %d successfully', block_number)
@@ -452,7 +452,7 @@ class PyDlpRfid2(object):
                                     flags=flagsbyte(address=False,
                                                     high_data_rate=True,
                                                     option=False),  # 32 (dec) <-> 20 (hex)
-                                    command_code='%02X'%NTAG5_CMD["WRITE_AFI"]["code"],
+                                    command_code=NTAG5_CMD["WRITE_AFI"]["code"],
                                     data='C2')
 
     def lock_afi(self, uid):
@@ -460,7 +460,7 @@ class PyDlpRfid2(object):
                                     flags=flagsbyte(address=False,
                                                     high_data_rate=False,
                                                     option=False),  # 32 (dec) <-> 20 (hex)
-                                    command_code='%02X'%NTAG5_CMD["WRITE_AFI"]["code"],
+                                    command_code=NTAG5_CMD["WRITE_AFI"]["code"],
                                     data='07')
 
     def issue_evm_command(self, cmd, prms='', get_full_response=False):
@@ -495,9 +495,9 @@ class PyDlpRfid2(object):
             return self.get_response(response)
 
     def issue_iso15693_command(self, cmd, flags='', command_code='', data=''):
-        if cmd == DLP_CMD["REQUESTCMD"]["code"] and int(command_code, 16) > 0x2C:
+        if cmd == DLP_CMD["REQUESTCMD"]["code"] and command_code > 0x2C:
             data = "04"+data #add manuf_code to command data
-        return self.issue_evm_command(cmd, flags + command_code + data)
+        return self.issue_evm_command(cmd, flags + '%02X'%command_code + data)
 
     def flush(self):
         self.sp.readall()
