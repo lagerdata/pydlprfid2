@@ -223,24 +223,26 @@ class NtagInterface(PyDlpRfid2):
 
   def discover(self):
     response = self.inventory()
-    if len(response) > 0:
-      self.logger.info(f"Discovered NFC tag with uuid {response[0]}")
-      return response[0]
-    else:
+    try:
+      if len(response) > 0:
+        self.logger.info(f"Discovered NFC tag with uuid {response[0]}")
+        return response[0]
+    except:
       self.logger.error("No tag found in RF field")
       return None
 
   def select(self, tag_uuid):
-    response = self.issue_iso15693_command(cmd=DLP_CMD["REQUESTCMD"]["code"],
-                                flags=flagsbyte(address=True),
-                                command_code=NTAG5_CMD["SELECT"]["code"],
-                                data=tag_uuid)
-    if len(response) > 0 and response[0] == '00':
-      self.logger.info("Successfully selected NTAG5")
-      return "NTAG5_SELECTED"
-    else:
-      self.logger.error("Failed to select NTAG5")
-      return None
+    if tag_uuid != None:
+      response = self.issue_iso15693_command(cmd=DLP_CMD["REQUESTCMD"]["code"],
+                                  flags=flagsbyte(address=True),
+                                  command_code=NTAG5_CMD["SELECT"]["code"],
+                                  data=tag_uuid)
+      if len(response) > 0 and response[0] == '00':
+        self.logger.info("Successfully selected NTAG5")
+        return "NTAG5_SELECTED"
+      else:
+        self.logger.error("Failed to select NTAG5")
+        return None
 
   #high level interface methods:
   def configure_energyharvesting(self):
