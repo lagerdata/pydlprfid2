@@ -81,7 +81,7 @@ NTAG5_CMD = {
         "LOCK_DSFID":               {"code": 0x2A, "desc": "Lock DSFID"},
         "GET_SYS_INFO":             {"code": 0x2B, "desc": "Get System Info"},
         "GET_MULT_BLOC_SEC_INFO":   {"code": 0x2C, "desc": "Get Multiple Block Security Status"},
-        
+
         "READ_CONF":                {"code": 0xC0, "desc": "Read Configuration"},
         "WRITE_CONF":               {"code": 0xC1, "desc": "Write Configuration"},
         "READ_SRAM":                {"code": 0xD2, "desc": "Read SRAM"},
@@ -311,7 +311,7 @@ class PyDlpRfid2(object):
                     uid = itm[0]
                     rssi = itm[1]
                     self.logger.info('Found tag: %s (%s) ', uid, rssi)
-                    return reverse_uid(uid), rssi
+                    return uid, rssi
 
     def get_dlp_rfid2_firmware_version(self):
         response = self.issue_evm_command(DLP_CMD["VERSION"]["code"], get_full_response=True)

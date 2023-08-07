@@ -221,11 +221,20 @@ class NtagInterface(PyDlpRfid2):
                                 data = f"{NTAG5_ADDR['SRAM_END']['address']:02X}{'00'}{'46464646'}")
     self.read_sram()
 
-  def select(self):
+  def discover(self):
+    response = self.inventory()
+    if len(response) > 0:
+      self.logger.info(f"Discovered NFC tag with uuid {response[0]}")
+      return response[0]
+    else:
+      self.logger.error("No tag found in RF field")
+      return None
+
+  def select(self, tag_uuid):
     response = self.issue_iso15693_command(cmd=DLP_CMD["REQUESTCMD"]["code"],
                                 flags=flagsbyte(address=True),
                                 command_code=NTAG5_CMD["SELECT"]["code"],
-                                data='0011ABF6580104E0')
+                                data=tag_uuid)
     if len(response) > 0 and response[0] == '00':
       self.logger.info("Successfully selected NTAG5")
       return "NTAG5_SELECTED"
@@ -265,8 +274,8 @@ class NtagInterface(PyDlpRfid2):
     self.init_kit()
     self.enable_internal_antenna()
     self.set_protocol()
-    self.inventory()
-    if self.select() == "NTAG5_SELECTED":
+    tag_uuid = self.discover()
+    if self.select(tag_uuid) == "NTAG5_SELECTED":
       return "INIT_OK"
     else:
       return None
