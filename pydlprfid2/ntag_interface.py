@@ -4,6 +4,7 @@ import serial
 import logging
 import re
 import time
+import math
 from pydlprfid2 import PyDlpRfid2, ISO14443A, ISO14443B, ISO15693#, DLP_CMD, NTAG5_CMD, NTAG5_ADDR
 # from crc import CRC
 
@@ -81,10 +82,13 @@ NTAG5_ADDR = {
         }
 
 NTAG5_CONFIG = {
+        "CONFIG_0":           {"address": 0x37, "byte": 0x00},
+        "CONFIG_1":           {"address": 0x37, "byte": 0x01},
+        "CONFIG_2":           {"address": 0x37, "byte": 0x02},
         "SRAM_PROT_CONFIG":   {"address": 0x3F, "byte": 0x01},
+        "DEVICE_SEC_CONFIG":  {"address": 0x3F, "byte": 0x00},
         "EH_CONFIG":          {"address": 0x3D, "byte": 0x00},
         "ED_CONFIG":          {"address": 0x3D, "byte": 0x02},
-        "DEVICE_SEC_CONFIG":  {"address": 0x3F, "byte": 0x00},
         }
 
 NTAG5_REGISTERS = {
@@ -121,7 +125,7 @@ class NtagInterface(PyDlpRfid2):
 
   def __init__(self):
     self.app_state="state_initialization"
-    super().__init__(serial_port="/dev/ttyUSB0", loglevel=logging.DEBUG)
+    super().__init__(serial_port="/dev/ttyUSB0", loglevel=logging.INFO)
 
   #low level interface methods:
   def get_memory_block(self, address):
@@ -129,39 +133,30 @@ class NtagInterface(PyDlpRfid2):
                                 flags=flagsbyte(),
                                 command_code=NTAG5_CMD["READ_CONF"]["code"],
                                 data = f"{address:02X}{'00'}")
-    if len(response) > 0 and len(response[0]) > 1:
-      data = response[0][2:]
-      return data[:8]
-    else:
-      self.logger.error("failed to get memory block")
-      return None
+    if len(response) < 0 and len(response[0]) > 1: return self.logger.error("failed to get memory block")
+    data = response[0][2:]
+    return data[:8]
 
   def get_memory_byte(self, address, byte):
     response = self.get_memory_block(address)
-    if response != None:
-      if 0x0 <= byte <= 0x3:
-        return response[byte * 2 : (byte * 2) + 2]
-      else:
-        self.logger.error("invalid byte index")
-        return None
-    else:
-      return None
+    if response == None: return None
+    if not (0x0 <= byte <= 0x3): return self.logger.error("invalid byte index")
+    return response[byte * 2 : (byte * 2) + 2]
 
   def get_register_bit(self, register, bit_mask):
+    self.logger.debug(f"Reading register {register}, {bit_mask}")
     register_byte  = self.get_memory_byte(NTAG5_REGISTERS[register]["address"], NTAG5_REGISTERS[register]["byte"])
-    if register_byte != None:
-      return int(register_byte, 16) & NTAG5_REGISTERS[register][bit_mask]
-    else:
-      return None
+    if register_byte == None: return None
+    return int(register_byte, 16) & NTAG5_REGISTERS[register][bit_mask]
 
   def get_config_bit(self, config, bit_mask):
+    self.logger.debug(f"Reading config {config}, {bit_mask}")
     config_byte  = self.get_memory_byte(NTAG5_CONFIG[config]["address"], NTAG5_CONFIG[config]["byte"])
-    if config_byte != None:
-      return int(config_byte, 16) & NTAG5_CONFIG[config][bit_mask]
-    else:
-      return None
+    if config_byte == None: return None
+    return int(config_byte, 16) & NTAG5_CONFIG[config][bit_mask]
 
   def set_memory_block(self, address, value):
+    self.logger.debug(f"Writing memory @ {address} with {value}")
     value_string = f"{value:08X}"
     data_bytes = [value_string[i:i+2] for i in range(0, len(value_string), 2)]
     data_bytes.reverse()
@@ -170,8 +165,7 @@ class NtagInterface(PyDlpRfid2):
                                 flags=flagsbyte(),
                                 command_code=NTAG5_CMD["WRITE_CONF"]["code"],
                                 data = f"{address:02X}{data_inverse}")
-    if not (len(response) > 0):
-      self.logger.error("failed to set memory block")
+    if (len(response) <= 0): self.logger.error("failed to set memory block")
 
   # def set_memory_byte(address, byte, value):
   #   # current_block_value = self.get_memory_block(address)
@@ -187,41 +181,74 @@ class NtagInterface(PyDlpRfid2):
   #   # todo
 
   def read_sram(self):
-    response_1 = self.issue_iso15693_command(cmd=DLP_CMD["REQUESTCMD"]["code"],
+    self.logger.debug(f"Reading sram")
+    response_1 = []
+    response_2 = []
+    response_3 = []
+    response = self.issue_iso15693_command(cmd=DLP_CMD["REQUESTCMD"]["code"],
                                 flags=flagsbyte(),
                                 command_code=NTAG5_CMD["READ_SRAM"]["code"],
-                                data = f"{NTAG5_ADDR['SRAM_START']['address']:02X}{'15'}")
-    response_2 = self.issue_iso15693_command(cmd=DLP_CMD["REQUESTCMD"]["code"],
-                                flags=flagsbyte(),
-                                command_code=NTAG5_CMD["READ_SRAM"]["code"],
-                                data = f"{(0x15+NTAG5_ADDR['SRAM_START']['address']):02X}{'15'}")
-    response_3 = self.issue_iso15693_command(cmd=DLP_CMD["REQUESTCMD"]["code"],
-                                flags=flagsbyte(),
-                                command_code=NTAG5_CMD["READ_SRAM"]["code"],
-                                data = f"{0x2A+NTAG5_ADDR['SRAM_START']['address']:02X}{'15'}")
-    if len(reponse_1) > 0 and len(reponse_2) > 0  and len(reponse_3) > 0:
-      print(f"\n{bytes.fromhex(response_1[0]).decode('utf-8')}")
-      print(bytes.fromhex(response_2[0]).decode("utf-8"))
-      print(bytes.fromhex(response_3[0]).decode("utf-8"))
+                                data = f"{NTAG5_ADDR['SRAM_START']['address']:02X}{'00'}")
+    if(len(response)>0):
+      length = int(response[0][2:4], 16)/4
+      length = math.ceil(length)
     else:
-      print("error reading sram")
+      return print("error reading header")
 
-  def write_sram(self, string):
-    hex_string = string.encode().hex()
-    formatted_data = hex_string.ljust(512, '0')
+    if length > 15:
+      response_1 = self.issue_iso15693_command(cmd=DLP_CMD["REQUESTCMD"]["code"],
+                                  flags=flagsbyte(),
+                                  command_code=NTAG5_CMD["READ_SRAM"]["code"],
+                                  data = f"{(NTAG5_ADDR['SRAM_START']['address'])+1:02X}{'15'}")
+      length = length - 15
+      if length > 15:
+        response_2 = self.issue_iso15693_command(cmd=DLP_CMD["REQUESTCMD"]["code"],
+                                    flags=flagsbyte(),
+                                    command_code=NTAG5_CMD["READ_SRAM"]["code"],
+                                    data = f"{(NTAG5_ADDR['SRAM_START']['address'])+1+15:02X}{'15'}")
+        length = length - 15
+        if length > 0:
+          response_3 = self.issue_iso15693_command(cmd=DLP_CMD["REQUESTCMD"]["code"],
+                                      flags=flagsbyte(),
+                                      command_code=NTAG5_CMD["READ_SRAM"]["code"],
+                                      data = f"{(NTAG5_ADDR['SRAM_START']['address'])+1+15:02X}{length:02X}")
+      else:
+        response_2 = self.issue_iso15693_command(cmd=DLP_CMD["REQUESTCMD"]["code"],
+                                    flags=flagsbyte(),
+                                    command_code=NTAG5_CMD["READ_SRAM"]["code"],
+                                    data = f"{(NTAG5_ADDR['SRAM_START']['address'])+1+15:02X}{length:02X}")
+    else:
+      response_1 = self.issue_iso15693_command(cmd=DLP_CMD["REQUESTCMD"]["code"],
+                                  flags=flagsbyte(),
+                                  command_code=NTAG5_CMD["READ_SRAM"]["code"],
+                                  data = f"{(NTAG5_ADDR['SRAM_START']['address'])+1:02X}{length:02X}")
+    if len(response_1) > 0:
+      print(bytes.fromhex(response_1[0]).decode("utf-8"))
+    if len(response_2) > 0:
+      print(bytes.fromhex(response_2[0]).decode("utf-8"))
+    if len(response_3) > 0:
+      print(bytes.fromhex(response_3[0]).decode("utf-8"))
+    self.issue_iso15693_command(cmd=DLP_CMD["REQUESTCMD"]["code"],
+                                flags=flagsbyte(),
+                                command_code=NTAG5_CMD["READ_SRAM"]["code"],
+                                data = f"{NTAG5_ADDR['SRAM_END']['address']:02X}{'00'}")
+
+  def write_sram(self, data):
+    data_str = ''.join(f'{byte:02X}' for byte in data)
+    size = (len(data_str)//8)-1
+    size_str = f'{size:02X}'
+    self.logger.debug(f"Writing sram with: {data_str} length: {size_str}+1")
     response = self.issue_iso15693_command(cmd=DLP_CMD["REQUESTCMD"]["code"],
                                 flags=flagsbyte(),
                                 command_code=NTAG5_CMD["WRITE_SRAM"]["code"],
-                                # data = f"{NTAG5_ADDR['SRAM_START']['address']:02X}{'3F'}{formatted_data.upper()}")
-                                data = f"{NTAG5_ADDR['SRAM_START']['address']:02X}{'01'}{'3030303031313131'}")
+                                data = f"{NTAG5_ADDR['SRAM_START']['address']:02X}{size_str}{data_str}")
     response = self.issue_iso15693_command(cmd=DLP_CMD["REQUESTCMD"]["code"],
                                 flags=flagsbyte(),
                                 command_code=NTAG5_CMD["WRITE_SRAM"]["code"],
-                                # data = f"{NTAG5_ADDR['SRAM_START']['address']:02X}{'3F'}{formatted_data.upper()}")
-                                data = f"{NTAG5_ADDR['SRAM_END']['address']:02X}{'00'}{'46464646'}")
-    self.read_sram()
+                                data = f"{NTAG5_ADDR['SRAM_END']['address']:02X}{'00'}{'FFFFFFFF'}")
 
   def discover(self):
+    self.logger.debug(f"Looking for ntag")
     response = self.inventory()
     try:
       if len(response) > 0:
@@ -232,17 +259,15 @@ class NtagInterface(PyDlpRfid2):
       return None
 
   def select(self, tag_uuid):
+    self.logger.debug(f"Selecting ntag")
     if tag_uuid != None:
       response = self.issue_iso15693_command(cmd=DLP_CMD["REQUESTCMD"]["code"],
                                   flags=flagsbyte(address=True),
                                   command_code=NTAG5_CMD["SELECT"]["code"],
                                   data=tag_uuid)
-      if len(response) > 0 and response[0] == '00':
-        self.logger.info("Successfully selected NTAG5")
-        return "NTAG5_SELECTED"
-      else:
-        self.logger.error("Failed to select NTAG5")
-        return None
+      if len(response) != 1 and response[0] != '00': return self.logger.error("Failed to select NTAG5")
+      self.logger.info("Successfully selected NTAG5")
+      return "NTAG5_SELECTED"
 
   #high level interface methods:
   def configure_energyharvesting(self):
@@ -257,61 +282,64 @@ class NtagInterface(PyDlpRfid2):
       return None
 
   def get_data_direction(self):
+    self.logger.debug(f"Reading configured data direction")
     i2c_if_locked = self.get_register_bit("STATUS_1_REG", "I2C_IF_LOCKED_mask")
     nfc_if_locked = self.get_register_bit("STATUS_1_REG", "NFC_IF_LOCKED_mask")
     pt_xfer_dir   = self.get_register_bit("CONFIG_1_REG", "PT_TRANSFER_DIR_mask")
     ed_config     = self.get_register_bit("ED_CONFIG_REG", "ED_CONFIG_mask")
-    if i2c_if_locked == 0x1 and pt_xfer_dir == 0x0 and ed_config == 0x3:
-      return "I2C_NFC"
-    if nfc_if_locked == 0x1 and pt_xfer_dir == 0x1 and ed_config == 0x4:
-      return "NFC_I2C"
+    self.logger.debug(F"i2c_if_locked {i2c_if_locked}, nfc_if_locked {nfc_if_locked}, pt_xfer_dir {pt_xfer_dir}, ed_config {ed_config}")
+    if pt_xfer_dir == 0x0 and ed_config == 0x3: return "I2C_NFC"
+    if pt_xfer_dir == 0x1 and ed_config == 0x4: return "NFC_I2C"
     self.logger.error("invalid ntag configuration")
     return None
 
-
   def get_sram_data_ready(self):
-    return self.get_register_bit("STATUS_0_REG", "SRAM_DATA_RDY_mask")
+    self.logger.debug(f"Reading sram data ready")
+    sram_data_rdy = self.get_register_bit("STATUS_0_REG", "SRAM_DATA_RDY_mask")
+    return sram_data_rdy
 
   def initialize_connection(self):
+    self.logger.debug(f"Initializing connection")
     self.init_kit()
-    self.enable_internal_antenna()
+    self.enable_external_antenna()
     self.set_protocol()
     tag_uuid = self.discover()
-    if self.select(tag_uuid) == "NTAG5_SELECTED":
-      return "INIT_OK"
-    else:
-      return None
+    if self.select(tag_uuid) != "NTAG5_SELECTED": return None
+    self.logger.info("Waiting for MCU to boot up:")
+    return "INIT_OK"
 
   #state machine methods:
   def state_init(self):
+    self.logger.debug(f"Running init state")
     if self.initialize_connection() == "INIT_OK":
       self.app_state = "state_trigger_energy_harvest"
-      # self.app_state = "state_i2c_nfc_direction"
+      self.app_state = "state_i2c_nfc_direction"
 
   def state_trigger_eh(self):
+    self.logger.debug(f"Running energy harvest trigger state")
     print("....running state trigger energy harvest", end='\r')
     if self.configure_energyharvesting() == "ENERGY_HARVEST_SET":
       self.app_state = "state_i2c_nfc_direction"
 
   def state_i2c_nfc_dir(self):
-    print("..................running state i2c->nfc", end='\r')
-    if self.get_sram_data_ready():
-      message = self.read_sram()
-      if self.get_sram_data_ready():
-        print(f"...... failed to read SRAM, trying again", end='\r')
-      else:
-        self.app_state = "state_nfc_i2c_direction"
-    else:
-      print("...........waiting for mcu to write sram", end='\r')
+    # print("..................running state i2c->nfc", end='\r')
+    if self.get_data_direction()  != "I2C_NFC": return print("waiting for mcu to switch data direction", end='\r')
+    if self.get_sram_data_ready() != 32:         return
+    self.logger.debug(f"sram is written by mcu, reading")
+    message = self.read_sram()
+    if self.get_sram_data_ready() == 32:         return print(f"...... failed to read SRAM, trying again", end='\r')
+    self.app_state = "state_nfc_i2c_direction"
+    sys.exit(0)
 
   def state_nfc_i2c_dir(self):
+    self.logger.debug(f"Running nfc_i2c direction state")
     print("..................running state nfc->i2c", end='\r')
-    if self.get_data_direction() == "NFC_I2C":
-      self.write_sram("This data is sent from nfc reader")
-      self.app_state = "state_i2c_nfc_direction"
-    else:
-      print("waiting for mcu to switch data direction", end='\r')
-
+    if self.get_data_direction() != "NFC_I2C": return print("waiting for mcu to switch data direction", end='\r')
+    self.logger.debug(f"Data direction ok, sending command")
+    command = bytes([0x00, 0x00, 0xFF, 0xFF])
+    self.write_sram(command)
+    print("Command written to SRAM")
+    self.app_state = "state_i2c_nfc_direction"
 
   def default_state(self):
     self.logger.error("unexpteced state, error")
