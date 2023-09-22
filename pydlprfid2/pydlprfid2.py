@@ -310,7 +310,7 @@ class PyDlpRfid2(object):
                 if len(itm[0]) == 16:
                     uid = itm[0]
                     rssi = itm[1]
-                    self.logger.info('Found tag: %s (%s) ', uid, rssi)
+                    self.logger.debug('Found tag: %s (%s) ', uid, rssi)
                     return uid, rssi
 
     def get_dlp_rfid2_firmware_version(self):
