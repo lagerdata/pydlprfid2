@@ -122,6 +122,7 @@ def flagsbyte(double_sub_carrier=False, high_data_rate=False, inventory=False,
 
 class NtagInterface(PyDlpRfid2):
   app_state = None
+  start_time = 0
 
   def __init__(self):
     self.app_state="state_initialization"
@@ -252,7 +253,7 @@ class NtagInterface(PyDlpRfid2):
     response = self.inventory()
     try:
       if len(response) > 0:
-        self.logger.info(f"Discovered NFC tag with uuid {response[0]}")
+        self.logger.debug(f"Discovered NFC tag with uuid {response[0]}")
         return response[0]
     except:
       self.logger.error("No tag found in RF field")
@@ -266,7 +267,7 @@ class NtagInterface(PyDlpRfid2):
                                   command_code=NTAG5_CMD["SELECT"]["code"],
                                   data=tag_uuid)
       if len(response) != 1 and response[0] != '00': return self.logger.error("Failed to select NTAG5")
-      self.logger.info("Successfully selected NTAG5")
+      self.logger.debug("Successfully selected NTAG5")
       return "NTAG5_SELECTED"
 
   #high level interface methods:
@@ -305,7 +306,8 @@ class NtagInterface(PyDlpRfid2):
     self.set_protocol()
     tag_uuid = self.discover()
     if self.select(tag_uuid) != "NTAG5_SELECTED": return None
-    self.logger.info("Waiting for MCU to boot up:")
+    self.logger.debug("Waiting for MCU to boot up:")
+    self.start_time = time.perf_counter()
     return "INIT_OK"
 
   #state machine methods:
@@ -323,11 +325,12 @@ class NtagInterface(PyDlpRfid2):
 
   def state_i2c_nfc_dir(self):
     # print("..................running state i2c->nfc", end='\r')
+    if time.perf_counter() - self.start_time > 5:  sys.exit(1)
     if self.get_data_direction()  != "I2C_NFC": return print("waiting for mcu to switch data direction", end='\r')
-    if self.get_sram_data_ready() != 32:         return
+    if self.get_sram_data_ready() != 32:        return
     self.logger.debug(f"sram is written by mcu, reading")
     message = self.read_sram()
-    if self.get_sram_data_ready() == 32:         return print(f"...... failed to read SRAM, trying again", end='\r')
+    if self.get_sram_data_ready() == 32:        return print(f"...... failed to read SRAM, trying again", end='\r')
     self.app_state = "state_nfc_i2c_direction"
     sys.exit(0)
 
@@ -343,7 +346,7 @@ class NtagInterface(PyDlpRfid2):
 
   def default_state(self):
     self.logger.error("unexpteced state, error")
-    sys.exit(0)
+    sys.exit(1)
 
   state_machine = {
     "state_trigger_energy_harvest": state_trigger_eh,
